@@ -1,0 +1,333 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Russo+One&display=swap');
+
+@theme {
+  /* MODO DIABLO Color Palette */
+  --color-background: #0a0a0a;
+  --color-surface: #111111;
+  --color-surface-hover: #1a1a1a;
+  --color-blood: #ff0033;
+  --color-blood-dark: #cc0029;
+  --color-neon: #39ff14;
+  --color-neon-dark: #2ecc10;
+  --color-hot-pink: #ff006e;
+  --color-gold: #ffd700;
+  --color-accent: #ff0033;
+  --color-accent-hover: #cc0029;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-background);
+  color: white;
+  min-height: 100vh;
+  font-family: 'Russo One', 'Bebas Neue', Impact, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* GRAIN OVERLAY - Trashy texture */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* SCANLINES - Retro VHS effect */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.1) 0px,
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  opacity: 0.15;
+}
+
+/* Custom scrollbar - blood red */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-blood) 0%, var(--color-hot-pink) 100%);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neon);
+}
+
+/* GLOW EFFECTS */
+.glow-red {
+  box-shadow: 0 0 20px rgba(255, 0, 51, 0.5), 0 0 40px rgba(255, 0, 51, 0.3);
+}
+
+.glow-neon {
+  box-shadow: 0 0 20px rgba(57, 255, 20, 0.5), 0 0 40px rgba(57, 255, 20, 0.3);
+}
+
+.glow-pink {
+  box-shadow: 0 0 20px rgba(255, 0, 110, 0.5), 0 0 40px rgba(255, 0, 110, 0.3);
+}
+
+.text-glow-red {
+  text-shadow: 0 0 10px rgba(255, 0, 51, 0.8), 0 0 20px rgba(255, 0, 51, 0.5), 0 0 30px rgba(255, 0, 51, 0.3);
+}
+
+.text-glow-neon {
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.8), 0 0 20px rgba(57, 255, 20, 0.5), 0 0 30px rgba(57, 255, 20, 0.3);
+}
+
+/* GLITCH TEXT ANIMATION */
+@keyframes glitch {
+  0% {
+    text-shadow: 2px 0 var(--color-neon), -2px 0 var(--color-hot-pink);
+  }
+  25% {
+    text-shadow: -2px 0 var(--color-neon), 2px 0 var(--color-hot-pink);
+  }
+  50% {
+    text-shadow: 2px 0 var(--color-hot-pink), -2px 0 var(--color-neon);
+  }
+  75% {
+    text-shadow: -2px 0 var(--color-blood), 2px 0 var(--color-neon);
+  }
+  100% {
+    text-shadow: 2px 0 var(--color-neon), -2px 0 var(--color-hot-pink);
+  }
+}
+
+.glitch-text {
+  animation: glitch 0.3s infinite;
+}
+
+/* FLAME ANIMATION */
+@keyframes flame {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px var(--color-blood)) drop-shadow(0 0 10px var(--color-gold));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px var(--color-blood)) drop-shadow(0 0 25px var(--color-gold));
+  }
+}
+
+.flame-effect {
+  animation: flame 1.5s ease-in-out infinite;
+}
+
+/* PULSE ANIMATION */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--color-blood), 0 0 10px var(--color-blood);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--color-blood), 0 0 40px var(--color-blood), 0 0 60px var(--color-hot-pink);
+  }
+}
+
+.pulse-red {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* SHAKE ANIMATION - Aggressive */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+.shake-hover:hover {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* DRIP TEXT EFFECT */
+.drip-text {
+  position: relative;
+}
+
+.drip-text::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: 3px;
+  height: 0;
+  background: var(--color-blood);
+  transition: height 0.3s ease;
+  border-radius: 0 0 2px 2px;
+}
+
+.drip-text:hover::after {
+  height: 15px;
+}
+
+/* DIAGONAL STRIPES - Warning tape effect */
+.warning-stripes {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-gold),
+    var(--color-gold) 10px,
+    #000 10px,
+    #000 20px
+  );
+}
+
+/* CHROME/METAL TEXT */
+.chrome-text {
+  background: linear-gradient(180deg, #fff 0%, #999 40%, #fff 50%, #666 60%, #fff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* FIRE GRADIENT */
+.fire-gradient {
+  background: linear-gradient(180deg, var(--color-gold) 0%, var(--color-blood) 50%, #660000 100%);
+}
+
+/* NEON BORDER */
+.neon-border {
+  border: 2px solid var(--color-neon);
+  box-shadow: 0 0 5px var(--color-neon), inset 0 0 5px rgba(57, 255, 20, 0.1);
+}
+
+.blood-border {
+  border: 2px solid var(--color-blood);
+  box-shadow: 0 0 5px var(--color-blood), inset 0 0 5px rgba(255, 0, 51, 0.1);
+}
+
+/* TORN EDGE EFFECT */
+.torn-edge {
+  clip-path: polygon(
+    0% 0%, 5% 3%, 10% 0%, 15% 2%, 20% 0%, 25% 3%, 30% 0%, 35% 2%, 40% 0%, 45% 3%, 50% 0%,
+    55% 2%, 60% 0%, 65% 3%, 70% 0%, 75% 2%, 80% 0%, 85% 3%, 90% 0%, 95% 2%, 100% 0%,
+    100% 100%, 95% 97%, 90% 100%, 85% 98%, 80% 100%, 75% 97%, 70% 100%, 65% 98%, 60% 100%,
+    55% 97%, 50% 100%, 45% 98%, 40% 100%, 35% 97%, 30% 100%, 25% 98%, 20% 100%, 15% 97%,
+    10% 100%, 5% 98%, 0% 100%
+  );
+}
+
+/* TRASHY BUTTON STYLE */
+.trashy-btn {
+  position: relative;
+  background: linear-gradient(135deg, var(--color-blood) 0%, #990022 100%);
+  border: 3px solid var(--color-blood);
+  transform: skewX(-5deg);
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-family: 'Bebas Neue', Impact, sans-serif;
+}
+
+.trashy-btn:hover {
+  transform: skewX(-5deg) scale(1.05);
+  box-shadow: 0 0 30px var(--color-blood), 0 5px 20px rgba(0,0,0,0.5);
+}
+
+.trashy-btn:active {
+  transform: skewX(-5deg) scale(0.95);
+}
+
+.trashy-btn > * {
+  transform: skewX(5deg);
+}
+
+/* GRAFFITI STYLE SELECT */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ff0033' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+/* GENRE CARD STYLE */
+.genre-card {
+  position: relative;
+  background: linear-gradient(145deg, #1a1a1a 0%, #0a0a0a 100%);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.genre-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 0, 51, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.genre-card:hover::before {
+  left: 100%;
+}
+
+.genre-card:hover {
+  border-color: var(--color-blood);
+  box-shadow: 0 0 20px rgba(255, 0, 51, 0.3), inset 0 0 20px rgba(255, 0, 51, 0.1);
+  transform: scale(1.02) rotate(-1deg);
+}
+
+/* FIRE EMOJI ANIMATION */
+@keyframes fireEmoji {
+  0%, 100% { transform: scale(1) rotate(-5deg); }
+  50% { transform: scale(1.2) rotate(5deg); }
+}
+
+.fire-emoji {
+  display: inline-block;
+  animation: fireEmoji 0.5s ease-in-out infinite;
+}
+
+/* LOGO STYLE */
+.diablo-logo {
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: 3rem;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #fff 0%, var(--color-blood) 50%, #660000 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 10px rgba(255, 0, 51, 0.5));
+}
+
+/* SKULL DIVIDER */
+.skull-divider::before {
+  content: '💀';
+  display: block;
+  text-align: center;
+  font-size: 1.5rem;
+  margin: 1rem 0;
+  filter: drop-shadow(0 0 5px var(--color-blood));
+}
