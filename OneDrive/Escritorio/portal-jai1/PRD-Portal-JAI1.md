@@ -64,12 +64,11 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
 ### ⏳ Pendiente (Mejoras en curso):
 
 - Tests automatizados
-- Notificaciones WhatsApp (en desarrollo con Make)
-- Download document verification (tested, working)
 
 ### ❌ Funcionalidades EXCLUIDAS del MVP (Fase 2+):
 
 - **WebSocket / Real-time messaging** (ver sección 16 para justificación técnica)
+- **Notificaciones WhatsApp** (integración con Make)
 - App mobile nativa
 - Multi-idioma
 - Reportes avanzados y métricas
@@ -1416,7 +1415,6 @@ export const environment = {
 ### Pendiente
 
 - ☐ Tests automatizados
-- ☐ Notificaciones WhatsApp (Make)
 
 ---
 
