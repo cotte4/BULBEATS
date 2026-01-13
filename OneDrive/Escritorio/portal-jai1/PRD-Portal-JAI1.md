@@ -6,9 +6,9 @@
 
 ---
 
-| **Versión**                    | 0.4 - Database Hardening                 |
+| **Versión**                    | 0.5 - Client Portal Polished             |
 | ------------------------------ | ---------------------------------------- |
-| **Fecha Última Actualización** | 13 de Enero, 2026                        |
+| **Fecha Última Actualización** | 13 de Enero, 2026 (noche)                |
 | **Fecha Creación**             | 27 de Diciembre, 2024                    |
 | **Deadline MVP**               | 10 de Enero, 2025                        |
 | **Inicio Temporada**           | 28 de Enero, 2025 (Temporada Fiscal USA) |
@@ -60,10 +60,29 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
     - TEXT to UUID migration (12 tablas, 28 campos)
     - Row Level Security (RLS) en todas las tablas
 22. ✅ **Cache clearing on login** - COMPLETADO (v0.4)
+23. ✅ **Client Portal Polish (v0.5)** - COMPLETADO
+    - Profile: Removed in-app password change (use forgot password flow)
+    - Profile: Fixed loading race condition on first visit
+    - Sidebar: Fixed logout button visibility on desktop
+    - Calculator: Fixed mobile scroll to show CTA button
+    - Notifications: Added deletedAt filter (soft-delete support)
+    - Referrals: Expiration job now includes 'tax_form_submitted' status
+    - DiscountApplication: Unique constraint per referral
+    - Financial validation: CHECK constraints for non-negative amounts
 
-### ⏳ Pendiente (Mejoras en curso):
+### ⏳ Pendiente (Próximas prioridades):
 
-- Tests automatizados
+1. **Admin Panel Improvements** (Prioridad Alta)
+   - Revisión completa de funcionalidades admin
+   - UI/UX improvements para gestión de clientes
+   - Bulk actions para operaciones masivas
+   - Filtros avanzados y búsqueda
+   - Dashboard de métricas admin
+
+2. **Testing** (Prioridad Alta)
+   - Tests unitarios backend (services)
+   - Tests de integración (API endpoints)
+   - Tests E2E frontend (flujos críticos)
 
 ### ❌ Funcionalidades EXCLUIDAS del MVP (Fase 2+):
 
@@ -1389,7 +1408,7 @@ export const environment = {
 
 `auth · users · clients · documents · tickets · notifications · webhooks · calculator · referrals · progress`
 
-### Features en Producción (v0.4)
+### Features en Producción (v0.5)
 
 - ☑ Registro y login (cliente + admin)
 - ☑ Login con Google OAuth
@@ -1411,10 +1430,18 @@ export const environment = {
   - Row Level Security (RLS) on all tables
   - Optimized indexes
 - ☑ **Cache clearing on login** (fresh data guaranteed)
+- ☑ **Client Portal Polish (v0.5):**
+  - Profile page loading fix
+  - Sidebar responsiveness (desktop logout visible)
+  - Calculator mobile scroll fix
+  - Soft-delete support for notifications
+  - Financial validation constraints
+  - Referral expiration job improvements
 
-### Pendiente
+### Pendiente (Próximas Fases)
 
-- ☐ Tests automatizados
+- ☐ **Admin Panel Improvements** (Prioridad Alta)
+- ☐ **Tests automatizados** (Prioridad Alta)
 
 ---
 
@@ -1510,6 +1537,31 @@ Y veo mi posición si estoy en el ranking
 | Phase 8: TEXT to UUID migration (12 tables)  | ✅ Completo |
 | Cache clearing on login (fresh data)         | ✅ Completo |
 | All critical flows verified                  | ✅ Completo |
+
+## Cronograma v0.5 (13 Enero 2026 noche) - COMPLETADO
+
+| Tarea                                        | Estado      |
+| -------------------------------------------- | ----------- |
+| Profile: Remove change password section      | ✅ Completo |
+| Profile: Fix loading race condition          | ✅ Completo |
+| Sidebar: Fix logout visibility on desktop    | ✅ Completo |
+| Calculator: Enable mobile scrolling          | ✅ Completo |
+| Notifications: Add deletedAt filter          | ✅ Completo |
+| Referrals: Fix expiration job scope          | ✅ Completo |
+| DiscountApplication: Add unique constraint   | ✅ Completo |
+| Financial: Add CHECK constraints (>=0)       | ✅ Completo |
+
+## Próximas Fases (v0.6+)
+
+| Tarea                                        | Prioridad   |
+| -------------------------------------------- | ----------- |
+| Admin Panel: UI/UX review and improvements   | 🔴 Alta     |
+| Admin Panel: Bulk actions                    | 🔴 Alta     |
+| Admin Panel: Advanced filters and search     | 🔴 Alta     |
+| Admin Panel: Metrics dashboard               | 🟡 Media    |
+| Testing: Unit tests (backend services)       | 🔴 Alta     |
+| Testing: Integration tests (API endpoints)   | 🔴 Alta     |
+| Testing: E2E tests (critical user flows)     | 🟡 Media    |
 
 ---
 
@@ -1727,8 +1779,128 @@ portal-jai1-backend/
 
 ---
 
+# 18. CLIENT PORTAL POLISH (v0.5)
+
+## 18.1 Overview
+
+La versión 0.5 se enfocó en pulir la experiencia del cliente en el portal, corrigiendo bugs de responsiveness y mejorando la estabilidad del sistema.
+
+## 18.2 Fixes Implementados
+
+### Frontend
+
+| Componente | Problema | Solución |
+|------------|----------|----------|
+| **Profile** | "Cambiar contraseña" no funcionaba | Removido - usar "Olvidé mi contraseña" en login |
+| **Profile** | Loading infinito en primera visita | Fixed race condition en ngOnInit, añadido cdr.detectChanges() |
+| **Sidebar** | Logout button invisible en desktop | Added flex-shrink:0 a footer, overflow handling |
+| **Calculator** | Button "Continuar" no visible en mobile | Added overflow-y:auto en mobile breakpoint |
+
+### Backend
+
+| Módulo | Problema | Solución |
+|--------|----------|----------|
+| **Notifications** | Mostraba notificaciones eliminadas | Added `deletedAt: null` filter en queries |
+| **Referrals** | Referrals en 'tax_form_submitted' no expiraban | Updated expireOldReferrals cron job |
+| **Discounts** | Posibles duplicados por referral | Added unique constraint en Prisma schema |
+
+### Database (SQL Migrations)
+
+| Migration | Descripción |
+|-----------|-------------|
+| `20250113_discount_unique_constraint` | Unique index on (referral_id, discountType) |
+| `20250113_financial_validation` | CHECK constraints para non-negative amounts |
+| `20250113_backfill_refund_fields` | Migración de actualRefund → federal_actual_refund |
+
+## 18.3 CSS Changes
+
+```css
+/* Sidebar fix for desktop logout visibility */
+.sidebar { height: 100%; overflow: hidden; }
+.sidebar-header { flex-shrink: 0; }
+.sidebar-nav { flex: 1; overflow-y: auto; min-height: 0; }
+.sidebar-footer { flex-shrink: 0; }
+
+/* Calculator mobile scroll fix */
+@media (max-width: 640px) {
+  .calculator-container { overflow-y: auto; padding-bottom: 40px; }
+  .calculator-card { margin-bottom: 20px; }
+}
+```
+
+## 18.4 Files Modified
+
+```
+Frontend:
+├── src/app/components/profile/profile.ts        # Loading fix, removed password change
+├── src/app/components/profile/profile.html      # Removed security section
+├── src/app/components/main-layout/main-layout.css  # Sidebar responsiveness
+└── src/app/components/tax-calculator/tax-calculator.css  # Mobile scroll
+
+Backend:
+├── src/modules/notifications/notifications.service.ts  # deletedAt filter
+├── src/modules/referrals/referrals.service.ts   # Expiration job scope
+└── prisma/schema.prisma                         # DiscountApplication unique constraint
+
+Migrations:
+├── prisma/migrations/20250113_discount_unique_constraint/migration.sql
+├── prisma/migrations/20250113_financial_validation/migration.sql
+└── prisma/migrations/20250113_backfill_refund_fields/migration.sql
+```
+
+---
+
+# 19. PRÓXIMOS PASOS (v0.6+)
+
+## 19.1 Admin Panel Improvements (Prioridad Alta)
+
+El panel de administración necesita mejoras significativas para la temporada 2026:
+
+### UI/UX Review
+- [ ] Auditar todas las pantallas admin
+- [ ] Mejorar navegación y flujos de trabajo
+- [ ] Optimizar para operaciones frecuentes
+
+### Bulk Actions
+- [ ] Selección múltiple de clientes
+- [ ] Cambio de estado masivo
+- [ ] Envío de notificaciones masivas
+- [ ] Export masivo de datos
+
+### Filtros y Búsqueda
+- [ ] Filtro por estado (internal_status, client_status)
+- [ ] Filtro por fecha de registro
+- [ ] Filtro por problema (has_problem)
+- [ ] Búsqueda por nombre, email, SSN
+- [ ] Ordenamiento por columnas
+
+### Dashboard Métricas
+- [ ] Total clientes por estado
+- [ ] Clientes con problemas activos
+- [ ] Referrals pendientes/exitosos
+- [ ] Gráficos de progreso temporal
+
+## 19.2 Testing (Prioridad Alta)
+
+### Backend Tests
+- [ ] Unit tests para services (auth, users, clients, referrals)
+- [ ] Integration tests para controllers
+- [ ] Mock de Prisma y servicios externos
+
+### Frontend Tests
+- [ ] Unit tests para services críticos
+- [ ] Component tests para formularios
+- [ ] E2E tests para flujos: registro, login, upload, tax-form
+
+### Test Coverage Goals
+- Backend services: 80%+
+- API endpoints: 90%+
+- Critical user flows: 100%
+
+---
+
 **FIN DEL DOCUMENTO**
 
 _Este PRD debe ser usado como referencia única para el desarrollo del Portal JAI1. Cualquier cambio debe ser documentado y versionado._
 
-_Versión 0.4 - Última actualización: 13 de Enero, 2026_
+_Versión 0.5 - Última actualización: 13 de Enero, 2026 (noche)_
