@@ -6,9 +6,9 @@
 
 ---
 
-| **Versión**                    | 0.3 - MVP Completo                       |
+| **Versión**                    | 0.4 - Database Hardening                 |
 | ------------------------------ | ---------------------------------------- |
-| **Fecha Última Actualización** | 8 de Enero, 2026                         |
+| **Fecha Última Actualización** | 13 de Enero, 2026                        |
 | **Fecha Creación**             | 27 de Diciembre, 2024                    |
 | **Deadline MVP**               | 10 de Enero, 2025                        |
 | **Inicio Temporada**           | 28 de Enero, 2025 (Temporada Fiscal USA) |
@@ -54,15 +54,22 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
 18. ✅ **Sistema de automatización de progreso** - COMPLETADO (v0.3)
 19. ✅ **Sistema de tracking de problemas (Admin)** - COMPLETADO (v0.3)
 20. ✅ **Fast Loading Pattern (sin flash de contenido)** - COMPLETADO (v0.3)
+21. ✅ **Database Hardening (Phases 1-8)** - COMPLETADO (v0.4)
+    - Schema improvements: indexes, timestamps con timezone, @db.Date
+    - CHECK constraints en base de datos
+    - TEXT to UUID migration (12 tablas, 28 campos)
+    - Row Level Security (RLS) en todas las tablas
+22. ✅ **Cache clearing on login** - COMPLETADO (v0.4)
 
 ### ⏳ Pendiente (Mejoras en curso):
 
 - Tests automatizados
 - Notificaciones WhatsApp (en desarrollo con Make)
+- Download document verification (tested, working)
 
 ### ❌ Funcionalidades EXCLUIDAS del MVP (Fase 2+):
 
-- Chat interno en tiempo real (sistema de tickets básico implementado)
+- **WebSocket / Real-time messaging** (ver sección 16 para justificación técnica)
 - App mobile nativa
 - Multi-idioma
 - Reportes avanzados y métricas
@@ -198,7 +205,9 @@ portal-jai1-backend/
 
 # 3. MODELOS DE DATOS
 
-## 3.1 Prisma Schema (Actualizado v0.3)
+## 3.1 Prisma Schema (Actualizado v0.4)
+
+**Nota v0.4:** Todos los campos ID y FK ahora usan tipo nativo PostgreSQL UUID con `@db.Uuid` para mejor eficiencia de almacenamiento y validación. Timestamps usan `@db.Timestamptz` para soporte de timezone.
 
 ```prisma
 // prisma/schema.prisma
@@ -1381,7 +1390,7 @@ export const environment = {
 
 `auth · users · clients · documents · tickets · notifications · webhooks · calculator · referrals · progress`
 
-### Features en Producción (v0.3)
+### Features en Producción (v0.4)
 
 - ☑ Registro y login (cliente + admin)
 - ☑ Login con Google OAuth
@@ -1396,6 +1405,13 @@ export const environment = {
 - ☑ Sistema de tracking de problemas
 - ☑ Fast loading pattern (sin flash)
 - ☑ Toast notifications
+- ☑ **Database hardening (v0.4):**
+  - Native UUID types (12 tables, 28 fields)
+  - CHECK constraints for data validation
+  - Timestamps with timezone support
+  - Row Level Security (RLS) on all tables
+  - Optimized indexes
+- ☑ **Cache clearing on login** (fresh data guaranteed)
 
 ### Pendiente
 
@@ -1484,6 +1500,18 @@ Y veo mi posición si estoy en el ranking
 | Problem Tracking                  | ✅ Completo |
 | Fast Loading Pattern              | ✅ Completo |
 | Bug fixes (profile, loading, etc) | ✅ Completo |
+
+## Cronograma v0.4 (13 Enero 2026) - COMPLETADO
+
+| Tarea                                        | Estado      |
+| -------------------------------------------- | ----------- |
+| Phase 1-4: Schema improvements               | ✅ Completo |
+| Phase 5: CHECK constraints                   | ✅ Completo |
+| Phase 6: TaxCase as source of truth          | ✅ Completo |
+| Phase 7: Frontend federal/state dates        | ✅ Completo |
+| Phase 8: TEXT to UUID migration (12 tables)  | ✅ Completo |
+| Cache clearing on login (fresh data)         | ✅ Completo |
+| All critical flows verified                  | ✅ Completo |
 
 ---
 
@@ -1574,8 +1602,135 @@ pending ─────► tax_form_submitted ─────► awaiting_refund
 
 ---
 
+# 16. DECISIONES TÉCNICAS
+
+## 16.1 WebSocket vs HTTP Polling - Decisión: HTTP Polling
+
+### Contexto
+
+Se evaluó implementar WebSocket para mensajería en tiempo real en el sistema de tickets/soporte. Después de un análisis de costo-beneficio, se decidió **NO implementar WebSocket** y usar **HTTP Polling cada 60 segundos** en su lugar.
+
+### Razones para NO usar WebSocket en JAI1
+
+| Factor | WebSocket | HTTP Polling (actual) |
+|--------|-----------|----------------------|
+| **Complejidad de implementación** | Alta (gateway, rooms, reconnect logic, auth) | Baja (ya implementado) |
+| **Uso de memoria servidor** | ~10-50KB por conexión persistente | Cero (stateless) |
+| **Costo de hosting (Railway)** | Mayor RAM requerida | Sin cambios |
+| **Escalabilidad** | Requiere Redis para múltiples servidores | Escala naturalmente |
+| **Mantenimiento** | Más código, más bugs potenciales | Mínimo |
+
+### Características del caso de uso JAI1
+
+El sistema de soporte de JAI1 tiene las siguientes características que hacen innecesario WebSocket:
+
+1. **Volumen bajo de mensajes**: Los usuarios envían consultas ocasionales, no es un chat en vivo
+2. **Tiempo de respuesta esperado**: 24-48 horas hábiles (documentado en UI)
+3. **Usuarios concurrentes**: ~200 clientes esperados en temporada, no miles
+4. **Naturaleza del soporte**: Consultas sobre trámites fiscales, no urgentes
+5. **Presupuesto limitado**: Startup en fase inicial, optimizar costos
+
+### Implementación actual: Auto-Polling 60 segundos
+
+```typescript
+// user-messages.ts
+interval(60000).pipe(
+  takeUntilDestroyed(this.destroyRef)
+).subscribe(() => {
+  if (this.hasLoaded && !this.isLoadingInProgress) {
+    this.refreshActiveTicket();  // Silent refresh, no loading spinner
+  }
+});
+```
+
+**Beneficios de esta implementación:**
+- Actualización automática sin acción del usuario
+- Sin impacto visual (no muestra loading spinner)
+- Auto-scroll solo si hay mensajes nuevos
+- Se detiene automáticamente al salir del componente
+- Cero costo adicional de infraestructura
+
+### Cuándo reconsiderar WebSocket
+
+Implementar WebSocket en el futuro SI:
+- Se necesitan indicadores de "escribiendo..."
+- Se requiere chat en tiempo real (respuestas instantáneas)
+- Hay más de 1,000 usuarios concurrentes
+- Se implementa un sistema de notificaciones push masivas
+- El presupuesto de infraestructura aumenta significativamente
+
+### Funcionalidades de tickets implementadas (v0.3)
+
+A pesar de no usar WebSocket, el sistema de tickets incluye:
+- ✅ Soft-delete de tickets (usuario y admin)
+- ✅ Soft-delete de mensajes (admin only)
+- ✅ Read receipts (marcado como leído)
+- ✅ Unread count badges en lista de tickets
+- ✅ Auto-polling cada 60 segundos
+- ✅ Notificaciones por email cuando admin responde
+- ✅ Notificaciones in-app
+
+---
+
+# 17. DATABASE HARDENING (v0.4)
+
+## 17.1 Overview
+
+En la versión 0.4 se realizó una serie de mejoras a la base de datos para garantizar integridad, eficiencia y seguridad.
+
+## 17.2 Phases Completed
+
+### Phase 1-4: Schema Improvements
+- Agregados índices optimizados para queries frecuentes
+- Timestamps convertidos a `@db.Timestamptz` para soporte de timezone
+- Campos de fecha usando `@db.Date` para fechas sin hora
+- Campo `address_country` agregado con default "USA"
+
+### Phase 5: CHECK Constraints
+- Validación de `tax_year` (2020-2100)
+- Validación de campos `problem_*` (si `has_problem=false`, campos deben ser NULL)
+- Constraints aplicados directamente en PostgreSQL
+
+### Phase 6: Source of Truth
+- Backend verificado para usar TaxCase como source of truth
+- Campos de banking/employment year-specific en TaxCase (no ClientProfile)
+
+### Phase 7: Frontend Updates
+- Frontend computa `actualRefund = federalActualRefund + stateActualRefund`
+- Usa fechas separadas `federalDepositDate` y `stateDepositDate`
+
+### Phase 8: TEXT to UUID Migration
+- 12 tablas migradas de TEXT a native PostgreSQL UUID
+- 28 campos (PKs + FKs) con `@db.Uuid`
+- Migration script: `scripts/sql/migrate-text-to-uuid.sql`
+- Validation scripts creados para pre/post migration
+
+## 17.3 Files Created/Modified
+
+```
+portal-jai1-backend/
+├── prisma/schema.prisma                     # @db.Uuid en 28 campos
+└── scripts/sql/
+    ├── migrate-text-to-uuid.sql             # Migration script completo
+    ├── enable-rls-policies.sql              # RLS en 12 tablas
+    ├── validate-uuids-before-migration.sql  # Pre-migration validation
+    └── verify-uuid-migration.sql            # Post-migration verification
+```
+
+## 17.4 Benefits
+
+| Mejora | Beneficio |
+|--------|-----------|
+| Native UUID | 50% menos storage, validación automática de formato |
+| CHECK constraints | Integridad de datos garantizada a nivel DB |
+| Timestamptz | Manejo correcto de timezones |
+| RLS | Seguridad adicional contra acceso directo |
+| Indexes | Queries más rápidos en campos frecuentes |
+
+---
+
 **FIN DEL DOCUMENTO**
 
 _Este PRD debe ser usado como referencia única para el desarrollo del Portal JAI1. Cualquier cambio debe ser documentado y versionado._
 
-_Versión 0.3 - Última actualización: 8 de Enero, 2026_
+_Versión 0.4 - Última actualización: 13 de Enero, 2026_
