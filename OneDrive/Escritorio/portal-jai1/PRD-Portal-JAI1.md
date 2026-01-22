@@ -6,9 +6,9 @@
 
 ---
 
-| **Versión**                    | 0.5 - Client Portal Polished             |
+| **Versión**                    | 0.6 - Status System v2 & Alarm System    |
 | ------------------------------ | ---------------------------------------- |
-| **Fecha Última Actualización** | 13 de Enero, 2026 (noche)                |
+| **Fecha Última Actualización** | 17 de Enero, 2026                        |
 | **Fecha Creación**             | 27 de Diciembre, 2024                    |
 | **Deadline MVP**               | 10 de Enero, 2025                        |
 | **Inicio Temporada**           | 28 de Enero, 2025 (Temporada Fiscal USA) |
@@ -69,6 +69,39 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
     - Referrals: Expiration job now includes 'tax_form_submitted' status
     - DiscountApplication: Unique constraint per referral
     - Financial validation: CHECK constraints for non-negative amounts
+24. ✅ **Status System v2 (v0.6)** - COMPLETADO
+    - Unified CaseStatus enum (awaiting_form, awaiting_docs, preparing, taxes_filed, case_issues)
+    - Enhanced FederalStatusNew tracking (8 estados detallados)
+    - Enhanced StateStatusNew tracking (8 estados detallados)
+    - PreFilingStatus enum for pre-filing workflow
+    - Phase-based workflow (taxesFiled flag separates pre/post filing)
+    - Complete status change timestamps per track
+25. ✅ **Alarm System (v0.6)** - COMPLETADO
+    - AlarmThreshold per tax case (custom or global defaults)
+    - AlarmHistory tracking with resolution workflow
+    - Alarm types: verification delays, letter timeouts, processing delays
+    - Alarm levels: warning, critical
+    - Auto-resolve when status changes
+    - Admin dashboard for active alarms
+26. ✅ **Audit Logs (v0.6)** - COMPLETADO
+    - Track security events (password changes, failed logins)
+    - Track financial events (refund updates, discount applications)
+    - Track document deletions
+    - IP address and user agent logging
+    - Admin export to CSV
+27. ✅ **Refresh Token System (v0.6)** - COMPLETADO
+    - Secure token rotation with hash storage
+    - Device info and IP tracking
+    - Token revocation and replacement chain
+    - Logout from all devices support
+28. ✅ **i18n / Multi-language (v0.6)** - COMPLETADO
+    - User language preference (preferredLanguage field)
+    - Spanish/English support
+    - Automatic notification translation
+29. ✅ **System Settings (v0.6)** - COMPLETADO
+    - Key-value configuration store
+    - Admin-managed settings
+    - Audit trail for setting changes
 
 ### ⏳ Pendiente (Próximas prioridades):
 
@@ -89,10 +122,8 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
 - **WebSocket / Real-time messaging** (ver sección 16 para justificación técnica)
 - **Notificaciones WhatsApp** (integración con Make)
 - App mobile nativa
-- Multi-idioma
-- Reportes avanzados y métricas
+- Reportes avanzados y métricas (dashboard básico implementado)
 - 2FA (Two-Factor Authentication)
-- Audit logs accesibles desde UI
 - Google Drive backup automático (descargar manual ya implementado)
 
 ---
@@ -223,9 +254,15 @@ portal-jai1-backend/
 
 # 3. MODELOS DE DATOS
 
-## 3.1 Prisma Schema (Actualizado v0.4)
+## 3.1 Prisma Schema (Actualizado v0.6)
 
-**Nota v0.4:** Todos los campos ID y FK ahora usan tipo nativo PostgreSQL UUID con `@db.Uuid` para mejor eficiencia de almacenamiento y validación. Timestamps usan `@db.Timestamptz` para soporte de timezone.
+**Nota v0.6:**
+- Todos los campos ID y FK usan tipo nativo PostgreSQL UUID con `@db.Uuid`
+- Timestamps usan `@db.Timestamptz` para soporte de timezone
+- Sistema de estados v2 con CaseStatus, FederalStatusNew, StateStatusNew
+- Sistema de alarmas con AlarmThreshold y AlarmHistory
+- Audit logs para tracking de seguridad
+- Refresh tokens con rotación segura
 
 ```prisma
 // prisma/schema.prisma
@@ -246,36 +283,54 @@ enum UserRole {
   admin
 }
 
-enum InternalStatus {
-  revision_de_registro
-  esperando_datos
-  falta_documentacion
-  en_proceso
-  en_verificacion
-  resolviendo_verificacion
-  inconvenientes
-  cheque_en_camino
-  esperando_pago_comision
-  proceso_finalizado
-}
-
-enum ClientStatus {
-  esperando_datos
-  cuenta_en_revision
-  taxes_en_proceso
-  taxes_en_camino
-  taxes_depositados
-  pago_realizado
-  en_verificacion
-  taxes_finalizados
-}
-
+// Legacy status enums (for backward compatibility)
 enum TaxStatus {
+  filed
   pending
   processing
   approved
   rejected
   deposited
+}
+
+// Pre-filing workflow status (before taxes are filed)
+enum PreFilingStatus {
+  awaiting_registration
+  awaiting_documents
+  documentation_complete
+}
+
+// NEW v0.6: Unified case status (replaces old status combination)
+enum CaseStatus {
+  awaiting_form
+  awaiting_docs
+  preparing
+  taxes_filed
+  case_issues
+}
+
+// NEW v0.6: Enhanced federal status tracking
+enum FederalStatusNew {
+  in_process
+  in_verification
+  verification_in_progress
+  verification_letter_sent
+  check_in_transit
+  issues
+  taxes_sent
+  taxes_completed
+}
+
+// NEW v0.6: Enhanced state status tracking
+enum StateStatusNew {
+  in_process
+  in_verification
+  verification_in_progress
+  verification_letter_sent
+  check_in_transit
+  issues
+  taxes_sent
+  taxes_completed
 }
 
 enum DocumentType {
@@ -295,10 +350,9 @@ enum NotificationType {
   docs_missing
   message
   system
-  problem_alert      // NUEVO v0.3
+  problem_alert
 }
 
-// NUEVO v0.3 - Referral System Enums
 enum ReferralStatus {
   pending
   tax_form_submitted
@@ -324,7 +378,6 @@ enum OcrConfidence {
   low
 }
 
-// NUEVO v0.3 - Problem Tracking Enum
 enum ProblemType {
   missing_documents
   incorrect_information
@@ -336,187 +389,320 @@ enum ProblemType {
   other
 }
 
+// NEW v0.6: Alarm System Enums
+enum AlarmType {
+  possible_verification_federal
+  possible_verification_state
+  verification_timeout
+  letter_sent_timeout
+}
+
+enum AlarmLevel {
+  warning
+  critical
+}
+
+enum AlarmResolution {
+  active
+  acknowledged
+  resolved
+  auto_resolved
+}
+
+// NEW v0.6: Audit Log Actions
+enum AuditAction {
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  DOCUMENT_DELETE
+  REFUND_UPDATE
+  DISCOUNT_APPLIED
+  LOGIN_FAILED
+}
+
 // ============= MODELS =============
 
 model User {
-  id            String    @id @default(uuid()) @db.Uuid
-  email         String    @unique
-  passwordHash  String    @map("password_hash")
-  role          UserRole  @default(client)
-  firstName     String    @map("first_name")
-  lastName      String    @map("last_name")
-  phone         String?
-  isActive      Boolean   @default(true) @map("is_active")
-  lastLoginAt   DateTime? @map("last_login_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  // NUEVO v0.3 - Google OAuth
+  id                    String    @id @default(uuid()) @db.Uuid
+  email                 String    @unique
+  passwordHash          String    @map("password_hash")
+  role                  UserRole  @default(client)
+  firstName             String    @map("first_name")
+  lastName              String    @map("last_name")
+  phone                 String?
+  profilePicturePath    String?   @map("profile_picture_path")  // NEW v0.6
   googleId              String?   @unique @map("google_id")
+  isActive              Boolean   @default(true) @map("is_active")
+  lastLoginAt           DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  resetToken            String?   @map("reset_token")
+  resetTokenExpiresAt   DateTime? @map("reset_token_expires_at") @db.Timestamptz
+  tokenVersion          Int       @default(1) @map("token_version")  // NEW v0.6
+  preferredLanguage     String    @default("es") @map("preferred_language") @db.VarChar(5)  // NEW v0.6
 
-  // NUEVO v0.3 - Referral System
+  // Referral program fields
   referralCode          String?   @unique @map("referral_code")
   referredByCode        String?   @map("referred_by_code")
-  referralCodeCreatedAt DateTime? @map("referral_code_created_at")
+  referralCodeCreatedAt DateTime? @map("referral_code_created_at") @db.Timestamptz
 
   // Relations
-  clientProfile   ClientProfile?
-  tickets         Ticket[]
-  ticketMessages  TicketMessage[]
-  notifications   Notification[]
-  statusChanges   StatusHistory[] @relation("ChangedBy")
+  clientProfile         ClientProfile?
+  notifications         Notification[]
+  statusChanges         StatusHistory[] @relation("ChangedBy")
+  ticketMessages        TicketMessage[]
+  tickets               Ticket[]
+  w2Estimates           W2Estimate[]
+  documentsUploaded     Document[]      @relation("DocumentUploader")
+  referralsMade         Referral[]      @relation("ReferrerUser")
+  referralReceived      Referral?       @relation("ReferredUser")
+  discountsReceived     DiscountApplication[] @relation("DiscountUser")
+  discountsApplied      DiscountApplication[] @relation("DiscountAppliedBy")
+  alarmsResolved        AlarmHistory[]        @relation("AlarmResolver")  // NEW v0.6
+  alarmThresholdsCreated AlarmThreshold[]     @relation("AlarmThresholdCreator")  // NEW v0.6
+  refreshTokens         RefreshToken[]  // NEW v0.6
+  systemSettingsUpdated SystemSetting[]       @relation("SystemSettingUpdater")  // NEW v0.6
+  auditLogsAsActor      AuditLog[]            @relation("AuditLogActor")  // NEW v0.6
+  auditLogsAsTarget     AuditLog[]            @relation("AuditLogTarget")  // NEW v0.6
 
-  // NUEVO v0.3 - Referral Relations
-  referralsMade    Referral[] @relation("ReferrerUser")
-  referralReceived Referral?  @relation("ReferredUser")
-
+  @@index([role])
+  @@index([isActive])
   @@map("users")
 }
 
-model ClientProfile {
-  id                  String   @id @default(uuid()) @db.Uuid
-  userId              String   @unique @map("user_id") @db.Uuid
+// NEW v0.6: Refresh token storage for secure token rotation
+model RefreshToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  tokenHash   String    @unique @map("token_hash")  // SHA-256 hash
+  deviceInfo  String?   @map("device_info")
+  ipAddress   String?   @map("ip_address")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  isRevoked   Boolean   @default(false) @map("is_revoked")
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz
+  replacedByTokenId String? @map("replaced_by_token_id") @db.Uuid
 
-  // Sensitive data (SSN and address encrypted at application level)
-  ssn                 String?
-  dateOfBirth         DateTime? @map("date_of_birth")
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedByToken RefreshToken? @relation("TokenReplacement", fields: [replacedByTokenId], references: [id])
+  replacedTokens  RefreshToken[] @relation("TokenReplacement")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([isRevoked])
+  @@index([userId, isRevoked])
+  @@map("refresh_tokens")
+}
+
+model ClientProfile {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @unique @map("user_id") @db.Uuid
+
+  // Sensitive data (encrypted at application level)
+  ssn               String?
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
 
   // Address
-  addressStreet       String?  @map("address_street")
-  addressCity         String?  @map("address_city")
-  addressState        String?  @map("address_state")
-  addressZip          String?  @map("address_zip")
+  addressStreet     String?   @map("address_street")
+  addressCity       String?   @map("address_city")
+  addressState      String?   @map("address_state")
+  addressZip        String?   @map("address_zip")
+  addressCountry    String?   @map("address_country") @default("USA")  // NEW v0.6
 
-  // Banking info
-  bankName            String?  @map("bank_name")
-  bankRoutingNumber   String?  @map("bank_routing_number")
-  bankAccountNumber   String?  @map("bank_account_number")
+  // TurboTax credentials (encrypted)
+  turbotaxEmail     String?   @map("turbotax_email")
+  turbotaxPassword  String?   @map("turbotax_password")
 
-  // Work info
-  workState           String?  @map("work_state")
-  employerName        String?  @map("employer_name")
+  // IRS account credentials (encrypted) - NEW v0.6
+  irsUsername       String?   @map("irs_username")
+  irsPassword       String?   @map("irs_password")
 
-  // TurboTax credentials (optional)
-  turbotaxEmail       String?  @map("turbotax_email")
-  turbotaxPassword    String?  @map("turbotax_password")
+  // State account credentials (encrypted) - NEW v0.6
+  stateUsername     String?   @map("state_username")
+  statePassword     String?   @map("state_password")
 
   // Profile status
-  profileComplete     Boolean  @default(false) @map("profile_complete")
-  isDraft             Boolean  @default(true) @map("is_draft")
+  profileComplete   Boolean   @default(false) @map("profile_complete")
+  isDraft           Boolean   @default(true) @map("is_draft")
 
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  taxCases TaxCase[]
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taxCases          TaxCase[]
 
+  @@index([profileComplete])
+  @@index([isDraft])
+  @@index([createdAt])
   @@map("client_profiles")
 }
 
 model TaxCase {
-  id                String         @id @default(uuid()) @db.Uuid
-  clientProfileId   String         @map("client_profile_id") @db.Uuid
-  taxYear           Int            @map("tax_year")
+  id                 String          @id @default(uuid()) @db.Uuid
+  clientProfileId    String          @map("client_profile_id") @db.Uuid
+  taxYear            Int             @map("tax_year")  // CHECK: 2020-2100
 
-  // Status tracking
-  internalStatus    InternalStatus @default(revision_de_registro) @map("internal_status")
-  clientStatus      ClientStatus   @default(esperando_datos) @map("client_status")
-  federalStatus     TaxStatus?     @map("federal_status")
-  stateStatus       TaxStatus?     @map("state_status")
+  // Phase indicator - separates pre-filing and post-filing workflows
+  taxesFiled         Boolean         @default(false) @map("taxes_filed")
+  taxesFiledAt       DateTime?       @map("taxes_filed_at") @db.Timestamptz
 
-  // Financial info
-  estimatedRefund   Decimal?       @map("estimated_refund") @db.Decimal(10, 2)
-  actualRefund      Decimal?       @map("actual_refund") @db.Decimal(10, 2)
-  refundDepositDate DateTime?      @map("refund_deposit_date")
+  // Pre-filing status (used when taxesFiled = false)
+  preFilingStatus    PreFilingStatus @default(awaiting_registration) @map("pre_filing_status")
 
-  // NUEVO v0.3 - Federal/State Separation
-  federalEstimatedDate DateTime?  @map("federal_estimated_date")
-  stateEstimatedDate   DateTime?  @map("state_estimated_date")
-  federalActualRefund  Decimal?   @map("federal_actual_refund") @db.Decimal(10, 2)
-  stateActualRefund    Decimal?   @map("state_actual_refund") @db.Decimal(10, 2)
-  federalDepositDate   DateTime?  @map("federal_deposit_date")
-  stateDepositDate     DateTime?  @map("state_deposit_date")
+  // Legacy status fields (deprecated, kept for migration)
+  federalStatus      TaxStatus?      @map("federal_status")
+  stateStatus        TaxStatus?      @map("state_status")
+  estimatedRefund    Decimal?        @map("estimated_refund") @db.Decimal(10, 2)
+
+  // Separate federal/state tracking (SOURCE OF TRUTH)
+  federalEstimatedDate  DateTime?    @map("federal_estimated_date") @db.Timestamptz
+  stateEstimatedDate    DateTime?    @map("state_estimated_date") @db.Timestamptz
+  federalActualRefund   Decimal?     @map("federal_actual_refund") @db.Decimal(10, 2)
+  stateActualRefund     Decimal?     @map("state_actual_refund") @db.Decimal(10, 2)
+  federalDepositDate    DateTime?    @map("federal_deposit_date") @db.Timestamptz
+  stateDepositDate      DateTime?    @map("state_deposit_date") @db.Timestamptz
+
+  // Federal status tracking (comments and dates) - NEW v0.6
+  federalLastComment      String?    @map("federal_last_comment")
+  federalStatusChangedAt  DateTime?  @map("federal_status_changed_at") @db.Timestamptz
+  federalLastReviewedAt   DateTime?  @map("federal_last_reviewed_at") @db.Timestamptz
+
+  // State status tracking (comments and dates) - NEW v0.6
+  stateLastComment        String?    @map("state_last_comment")
+  stateStatusChangedAt    DateTime?  @map("state_status_changed_at") @db.Timestamptz
+  stateLastReviewedAt     DateTime?  @map("state_last_reviewed_at") @db.Timestamptz
+
+  // ============= STATUS SYSTEM v2 (NEW v0.6) =============
+  // Unified case status
+  caseStatus            CaseStatus?       @map("case_status")
+  caseStatusChangedAt   DateTime?         @map("case_status_changed_at") @db.Timestamptz
+
+  // Enhanced federal status (new system)
+  federalStatusNew          FederalStatusNew?  @map("federal_status_new")
+  federalStatusNewChangedAt DateTime?          @map("federal_status_new_changed_at") @db.Timestamptz
+
+  // Enhanced state status (new system)
+  stateStatusNew            StateStatusNew?    @map("state_status_new")
+  stateStatusNewChangedAt   DateTime?          @map("state_status_new_changed_at") @db.Timestamptz
 
   // Payment tracking
-  paymentReceived   Boolean        @default(false) @map("payment_received")
-  commissionPaid    Boolean        @default(false) @map("commission_paid")
+  paymentReceived    Boolean         @default(false) @map("payment_received")
+  commissionPaid     Boolean         @default(false) @map("commission_paid")
 
-  // Year-specific employment and banking info
-  workState         String?        @map("work_state")
-  employerName      String?        @map("employer_name")
-  bankName          String?        @map("bank_name")
-  bankRoutingNumber String?        @map("bank_routing_number")
-  bankAccountNumber String?        @map("bank_account_number")
+  // Year-specific employment and banking info (SOURCE OF TRUTH)
+  workState          String?         @map("work_state")
+  employerName       String?         @map("employer_name")
+  bankName           String?         @map("bank_name")
+  bankRoutingNumber  String?         @map("bank_routing_number")
+  bankAccountNumber  String?         @map("bank_account_number")
 
-  statusUpdatedAt   DateTime       @default(now()) @map("status_updated_at")
+  statusUpdatedAt    DateTime        @default(now()) @map("status_updated_at") @db.Timestamptz
 
-  // NUEVO v0.3 - Admin Step Control (1-5)
-  adminStep         Int?           @map("admin_step")
+  // Admin step control: 1=Registration, 2=W2 Uploaded, 3=Tax Form Complete, 4=IRS Review, 5=Finalized
+  adminStep          Int?            @map("admin_step")
 
-  // NUEVO v0.3 - Problem Tracking
-  hasProblem         Boolean       @default(false) @map("has_problem")
-  problemStep        Int?          @map("problem_step")
-  problemType        ProblemType?  @map("problem_type")
-  problemDescription String?       @map("problem_description")
-  problemResolvedAt  DateTime?     @map("problem_resolved_at")
+  // Problem tracking (hidden from client)
+  hasProblem         Boolean         @default(false) @map("has_problem")
+  problemStep        Int?            @map("problem_step")
+  problemType        ProblemType?    @map("problem_type")
+  problemDescription String?         @map("problem_description")
+  problemResolvedAt  DateTime?       @map("problem_resolved_at") @db.Timestamptz
 
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  clientProfile  ClientProfile   @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
-  documents      Document[]
-  statusHistory  StatusHistory[]
+  documents          Document[]
+  statusHistory      StatusHistory[]
+  discounts          DiscountApplication[]
+  w2Estimates        W2Estimate[]
+  referrals          Referral[]
+  alarmThreshold     AlarmThreshold?  // NEW v0.6
+  alarmHistory       AlarmHistory[]   // NEW v0.6
+  clientProfile      ClientProfile   @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
 
   @@unique([clientProfileId, taxYear])
+  @@index([clientProfileId])
+  @@index([taxYear])
+  @@index([hasProblem])
+  @@index([createdAt])
+  @@index([taxesFiled])
+  @@index([preFilingStatus])
+  @@index([taxesFiled, preFilingStatus])
+  @@index([taxesFiled, createdAt])
+  // Indexes for alarm queries (status system v2)
+  @@index([caseStatus])
+  @@index([federalStatusNew])
+  @@index([stateStatusNew])
+  @@index([federalStatusNew, federalStatusNewChangedAt])
+  @@index([stateStatusNew, stateStatusNewChangedAt])
   @@map("tax_cases")
 }
 
 model Document {
-  id          String       @id @default(uuid()) @db.Uuid
-  taxCaseId   String       @map("tax_case_id") @db.Uuid
-  type        DocumentType
-  fileName    String       @map("file_name")
-  storagePath String       @map("storage_path")
-  mimeType    String       @map("mime_type")
-  fileSize    Int          @map("file_size")
-  taxYear     Int?         @map("tax_year")
-  isReviewed  Boolean      @default(false) @map("is_reviewed")
-  uploadedAt  DateTime     @default(now()) @map("uploaded_at")
+  id           String       @id @default(uuid()) @db.Uuid
+  taxCaseId    String       @map("tax_case_id") @db.Uuid
+  type         DocumentType
+  fileName     String       @map("file_name")
+  storagePath  String       @unique @map("storage_path")
+  mimeType     String       @map("mime_type")
+  fileSize     Int          @map("file_size")
+  taxYear      Int?         @map("tax_year")
+  isReviewed   Boolean      @default(false) @map("is_reviewed")
+  reviewedAt   DateTime?    @map("reviewed_at") @db.Timestamptz  // NEW v0.6
+  uploadedAt   DateTime     @default(now()) @map("uploaded_at") @db.Timestamptz
+  uploadedById String?      @map("uploaded_by_id") @db.Uuid  // NEW v0.6
 
   // Relations
-  taxCase TaxCase @relation(fields: [taxCaseId], references: [id], onDelete: Cascade)
+  taxCase      TaxCase      @relation(fields: [taxCaseId], references: [id], onDelete: Cascade)
+  uploadedBy   User?        @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
 
+  @@index([taxCaseId])
+  @@index([type])
+  @@index([uploadedAt])
+  @@index([isReviewed])
+  @@index([uploadedById])
   @@map("documents")
 }
 
 model Ticket {
-  id        String       @id @default(uuid()) @db.Uuid
-  userId    String       @map("user_id") @db.Uuid
-  subject   String
-  status    TicketStatus @default(open)
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  subject     String
+  status      TicketStatus @default(open)
+  unreadCount Int          @default(0) @map("unread_count")  // NEW v0.6
+  deletedAt   DateTime?    @map("deleted_at") @db.Timestamptz  // NEW v0.6
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages TicketMessage[]
+  messages    TicketMessage[]
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+  @@index([deletedAt])
   @@map("tickets")
 }
 
 model TicketMessage {
-  id        String   @id @default(uuid()) @db.Uuid
-  ticketId  String   @map("ticket_id") @db.Uuid
-  senderId  String   @map("sender_id") @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
+  ticketId  String    @map("ticket_id") @db.Uuid
+  senderId  String?   @map("sender_id") @db.Uuid
   message   String
-  createdAt DateTime @default(now()) @map("created_at")
+  isRead    Boolean   @default(false) @map("is_read")  // NEW v0.6
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz  // NEW v0.6
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sender User   @relation(fields: [senderId], references: [id])
+  sender    User?     @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  ticket    Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
+  @@index([ticketId])
+  @@index([senderId])
+  @@index([isRead])
+  @@index([deletedAt])
   @@map("ticket_messages")
 }
 
@@ -525,49 +711,68 @@ model StatusHistory {
   taxCaseId      String   @map("tax_case_id") @db.Uuid
   previousStatus String?  @map("previous_status")
   newStatus      String   @map("new_status")
-  changedById    String   @map("changed_by_id") @db.Uuid
+  changedById    String?  @map("changed_by_id") @db.Uuid
   comment        String?
-  createdAt      DateTime @default(now()) @map("created_at")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  taxCase   TaxCase @relation(fields: [taxCaseId], references: [id], onDelete: Cascade)
-  changedBy User    @relation("ChangedBy", fields: [changedById], references: [id])
+  changedBy      User?    @relation("ChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  taxCase        TaxCase  @relation(fields: [taxCaseId], references: [id], onDelete: Cascade)
 
+  @@index([taxCaseId])
+  @@index([changedById])
+  @@index([createdAt])
   @@map("status_history")
 }
 
 model Notification {
-  id        String           @id @default(uuid()) @db.Uuid
-  userId    String           @map("user_id") @db.Uuid
-  type      NotificationType
-  title     String
-  message   String
-  isRead    Boolean          @default(false) @map("is_read")
-  createdAt DateTime         @default(now()) @map("created_at")
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  type       NotificationType
+  title      String
+  message    String
+  isRead     Boolean          @default(false) @map("is_read")
+  isArchived Boolean          @default(false) @map("is_archived")  // NEW v0.6
+  deletedAt  DateTime?        @map("deleted_at") @db.Timestamptz  // NEW v0.6
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([isRead])
+  @@index([isArchived])
+  @@index([deletedAt])
+  @@index([userId, isRead])
+  @@index([userId, isArchived])
+  @@index([createdAt])
+  @@index([userId, createdAt])
   @@map("notifications")
 }
 
-// ============= NUEVO v0.3 - REFERRAL SYSTEM MODELS =============
+// ============= REFERRAL SYSTEM MODELS =============
 
 model Referral {
-  id              String         @id @default(uuid()) @db.Uuid
-  referrerId      String         @map("referrer_id") @db.Uuid
-  referredUserId  String         @unique @map("referred_user_id") @db.Uuid
-  referralCode    String         @map("referral_code")
-  status          ReferralStatus @default(pending)
-  taxCaseId       String?        @map("tax_case_id") @db.Uuid
-  completedAt     DateTime?      @map("completed_at")
-  referredDiscount Decimal?      @map("referred_discount") @db.Decimal(10, 2)
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  id               String         @id @default(uuid()) @db.Uuid
+  referrerId       String         @map("referrer_id") @db.Uuid
+  referredUserId   String         @unique @map("referred_user_id") @db.Uuid
+  referralCode     String         @map("referral_code")
+  status           ReferralStatus @default(pending)
+  taxCaseId        String?        @map("tax_case_id") @db.Uuid
+  completedAt      DateTime?      @map("completed_at") @db.Timestamptz
+  referredDiscount Decimal?       @map("referred_discount") @db.Decimal(10, 2)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
-  referrer     User @relation("ReferrerUser", fields: [referrerId], references: [id])
-  referredUser User @relation("ReferredUser", fields: [referredUserId], references: [id])
+  referrer     User     @relation("ReferrerUser", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser User     @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  taxCase      TaxCase? @relation(fields: [taxCaseId], references: [id], onDelete: SetNull)
+  discounts    DiscountApplication[]
 
+  @@index([referrerId])
+  @@index([status])
+  @@index([referrerId, status])
+  @@index([referralCode])
   @@map("referrals")
 }
 
@@ -583,60 +788,186 @@ model DiscountApplication {
   seasonYear       Int            @map("season_year")
   status           DiscountStatus @default(pending)
   notes            String?
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Relations
+  user          User      @relation("DiscountUser", fields: [userId], references: [id], onDelete: Cascade)
+  taxCase       TaxCase?  @relation(fields: [taxCaseId], references: [id], onDelete: SetNull)
+  referral      Referral? @relation(fields: [referralId], references: [id], onDelete: SetNull)
+  appliedByAdmin User?    @relation("DiscountAppliedBy", fields: [appliedByAdminId], references: [id], onDelete: SetNull)
+
+  @@unique([referralId, discountType])  // NEW v0.6: Prevent duplicate discounts per referral
+  @@index([userId])
+  @@index([status])
+  @@index([taxCaseId])
+  @@index([referralId])
+  @@index([seasonYear])
   @@map("discount_applications")
 }
 
-// NUEVO v0.3 - W2 Estimate from Calculator
 model W2Estimate {
-  id              String        @id @default(uuid()) @db.Uuid
-  userId          String        @map("user_id") @db.Uuid
-  taxYear         Int           @map("tax_year")
-  w2FileName      String?       @map("w2_file_name")
-  box2Federal     Decimal       @map("box2_federal") @db.Decimal(10, 2)
-  box17State      Decimal       @map("box17_state") @db.Decimal(10, 2)
-  estimatedRefund Decimal       @map("estimated_refund") @db.Decimal(10, 2)
-  ocrConfidence   OcrConfidence @map("ocr_confidence")
-  createdAt       DateTime      @default(now()) @map("created_at")
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @map("user_id") @db.Uuid
+  taxCaseId       String?        @map("tax_case_id") @db.Uuid  // NEW v0.6
+  box2Federal     Decimal        @map("box_2_federal") @db.Decimal(10, 2)
+  box17State      Decimal        @map("box_17_state") @db.Decimal(10, 2)
+  estimatedRefund Decimal        @map("estimated_refund") @db.Decimal(10, 2)
+  w2FileName      String         @map("w2_file_name")
+  w2StoragePath   String?        @unique @map("w2_storage_path")  // NEW v0.6
+  ocrConfidence   OcrConfidence  @map("ocr_confidence")
+  ocrRawResponse  Json?          @map("ocr_raw_response")  // NEW v0.6
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
-  @@unique([userId, taxYear])
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taxCase         TaxCase?       @relation(fields: [taxCaseId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([taxCaseId])
   @@map("w2_estimates")
+}
+
+// ============= ALARM SYSTEM (NEW v0.6) =============
+
+model AlarmThreshold {
+  id                    String   @id @default(uuid()) @db.Uuid
+  taxCaseId             String   @map("tax_case_id") @db.Uuid
+  // Custom thresholds (null = use global default)
+  federalInProcessDays      Int?  @map("federal_in_process_days")      // Default: 25
+  stateInProcessDays        Int?  @map("state_in_process_days")        // Default: 50
+  verificationTimeoutDays   Int?  @map("verification_timeout_days")    // Default: 63
+  letterSentTimeoutDays     Int?  @map("letter_sent_timeout_days")     // Default: 63
+  // Disable specific alarms
+  disableFederalAlarms  Boolean  @default(false) @map("disable_federal_alarms")
+  disableStateAlarms    Boolean  @default(false) @map("disable_state_alarms")
+  // Metadata
+  reason                String?
+  createdById           String?  @map("created_by_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  taxCase               TaxCase  @relation(fields: [taxCaseId], references: [id], onDelete: Cascade)
+  createdBy             User?    @relation("AlarmThresholdCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([taxCaseId])
+  @@index([createdById])
+  @@map("alarm_thresholds")
+}
+
+model AlarmHistory {
+  id                String          @id @default(uuid()) @db.Uuid
+  taxCaseId         String          @map("tax_case_id") @db.Uuid
+  alarmType         AlarmType       @map("alarm_type")
+  alarmLevel        AlarmLevel      @map("alarm_level")
+  track             String          // 'federal' or 'state'
+  message           String
+  thresholdDays     Int             @map("threshold_days")
+  actualDays        Int             @map("actual_days")
+  statusAtTrigger   String          @map("status_at_trigger")
+  statusChangedAt   DateTime        @map("status_changed_at") @db.Timestamptz
+  // Resolution tracking
+  resolution        AlarmResolution @default(active)
+  resolvedAt        DateTime?       @map("resolved_at") @db.Timestamptz
+  resolvedById      String?         @map("resolved_by_id") @db.Uuid
+  resolvedNote      String?         @map("resolved_note")
+  autoResolveReason String?         @map("auto_resolve_reason")
+  // Timestamps
+  triggeredAt       DateTime        @default(now()) @map("triggered_at") @db.Timestamptz
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  taxCase           TaxCase         @relation(fields: [taxCaseId], references: [id], onDelete: Cascade)
+  resolvedBy        User?           @relation("AlarmResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([taxCaseId])
+  @@index([alarmType])
+  @@index([alarmLevel])
+  @@index([resolution])
+  @@index([triggeredAt])
+  @@index([taxCaseId, resolution])
+  @@map("alarm_history")
+}
+
+// ============= AUDIT LOGS (NEW v0.6) =============
+
+model AuditLog {
+  id           String      @id @default(uuid()) @db.Uuid
+  userId       String?     @map("user_id") @db.Uuid
+  targetUserId String?     @map("target_user_id") @db.Uuid
+  action       AuditAction
+  details      Json?
+  ipAddress    String?     @map("ip_address")
+  userAgent    String?     @map("user_agent")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  user         User?       @relation("AuditLogActor", fields: [userId], references: [id], onDelete: SetNull)
+  targetUser   User?       @relation("AuditLogTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+// ============= SYSTEM SETTINGS (NEW v0.6) =============
+
+model SystemSetting {
+  key         String    @id
+  value       String
+  description String?
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String?   @map("updated_by") @db.Uuid
+
+  updatedByUser User?   @relation("SystemSettingUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([updatedBy])
+  @@map("system_settings")
 }
 ```
 
 ## 3.2 Estados del Trámite
 
-### Estados Internos (internal_status) - Solo Admins
+### Status System v2 (v0.6) - NUEVO
 
-| Estado                     | Descripción                                        |
-| -------------------------- | -------------------------------------------------- |
-| `revision_de_registro`     | Cliente se registró, admin debe revisar datos      |
-| `esperando_datos`          | Esperando que cliente complete F2 o suba W2        |
-| `falta_documentacion`      | Documentos incompletos o ilegibles                 |
-| `en_proceso`               | Equipo procesando la declaración                   |
-| `en_verificacion`          | IRS verificando (puede tomar tiempo)               |
-| `resolviendo_verificacion` | Trabajando en resolver issues del IRS              |
-| `inconvenientes`           | Problemas que requieren atención especial          |
-| `cheque_en_camino`         | Reembolso aprobado, en camino                      |
-| `esperando_pago_comision`  | Cliente recibió reembolso, pendiente pago comisión |
-| `proceso_finalizado`       | Todo completado, caso cerrado                      |
+El sistema de estados v2 reemplaza el sistema anterior con una estructura más clara basada en fases.
 
-### Estados del Cliente (client_status) - Visibles para el cliente
+#### CaseStatus (Estado Unificado del Caso)
 
-| Estado               | Texto mostrado al cliente                          |
-| -------------------- | -------------------------------------------------- |
-| `esperando_datos`    | "Necesitamos tus datos y documentos"               |
-| `cuenta_en_revision` | "Estamos revisando tu información"                 |
-| `taxes_en_proceso`   | "¡Estamos trabajando en tu declaración!"           |
-| `taxes_en_camino`    | "Tu reembolso está en camino"                      |
-| `taxes_depositados`  | "¡Reembolso depositado en tu cuenta!"              |
-| `pago_realizado`     | "Gracias por tu pago"                              |
-| `en_verificacion`    | "El IRS está verificando tu caso"                  |
-| `taxes_finalizados`  | "¡Proceso completado! Gracias por confiar en JAI1" |
+| Estado           | Descripción                                        |
+| ---------------- | -------------------------------------------------- |
+| `awaiting_form`  | Esperando que el cliente complete el formulario    |
+| `awaiting_docs`  | Esperando documentos (W2, etc.)                    |
+| `preparing`      | Preparando declaración de impuestos                |
+| `taxes_filed`    | Impuestos presentados, en proceso IRS              |
+| `case_issues`    | Problemas que requieren atención                   |
 
-### Admin Step Control (v0.3)
+#### PreFilingStatus (Pre-Presentación)
+
+Usado cuando `taxesFiled = false`:
+
+| Estado                    | Descripción                                    |
+| ------------------------- | ---------------------------------------------- |
+| `awaiting_registration`   | Esperando registro completo                    |
+| `awaiting_documents`      | Esperando documentos                           |
+| `documentation_complete`  | Documentación completa, listo para procesar    |
+
+#### FederalStatusNew / StateStatusNew (Post-Presentación)
+
+Usado cuando `taxesFiled = true`:
+
+| Estado                        | Descripción                                    |
+| ----------------------------- | ---------------------------------------------- |
+| `in_process`                  | En proceso inicial                             |
+| `in_verification`             | IRS/Estado verificando                         |
+| `verification_in_progress`    | Verificación en progreso activo                |
+| `verification_letter_sent`    | Carta de verificación enviada                  |
+| `check_in_transit`            | Cheque en camino                               |
+| `issues`                      | Problemas detectados                           |
+| `taxes_sent`                  | Impuestos enviados/procesados                  |
+| `taxes_completed`             | Proceso fiscal completado                      |
+
+### Admin Step Control
 
 | Step | Descripción                              |
 | ---- | ---------------------------------------- |
@@ -645,6 +976,15 @@ model W2Estimate {
 | 3    | Formulario fiscal completado             |
 | 4    | En proceso de revisión IRS               |
 | 5    | Finalizado                               |
+
+### Alarm Thresholds (v0.6)
+
+| Alarma                         | Default (días) | Descripción                           |
+| ------------------------------ | -------------- | ------------------------------------- |
+| Federal in_process             | 25             | Federal lleva demasiado en proceso    |
+| State in_process               | 50             | Estado lleva demasiado en proceso     |
+| Verification timeout           | 63             | Verificación sin resolver             |
+| Letter sent timeout            | 63             | Carta enviada sin respuesta           |
 
 ---
 
@@ -1056,6 +1396,146 @@ Calcula estimación de reembolso usando OCR en W2.
 
 Obtiene la última estimación guardada del usuario.
 
+### GET /calculator/history
+
+Lista todas las estimaciones del usuario.
+
+### GET /calculator/has-estimate
+
+Verifica si el usuario tiene alguna estimación.
+
+---
+
+## 5.11 Alarms (Admin) - NUEVO v0.6
+
+### GET /admin/alarms/dashboard
+
+Lista todos los casos con alarmas activas.
+
+**Response:**
+
+```json
+{
+  "casesWithAlarms": [
+    {
+      "taxCaseId": "uuid",
+      "clientName": "Juan Pérez",
+      "activeAlarms": [
+        {
+          "type": "possible_verification_federal",
+          "level": "warning",
+          "triggeredAt": "datetime",
+          "daysOverdue": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+### GET /admin/alarms/history
+
+Lista historial de alarmas con filtros.
+
+**Query params:** `resolution`, `alarmType`, `alarmLevel`, `startDate`, `endDate`, `limit`, `cursor`
+
+### POST /admin/alarms/:id/acknowledge
+
+Marca una alarma como "acknowledged" (reconocida).
+
+### POST /admin/alarms/:id/resolve
+
+Resuelve una alarma con nota opcional.
+
+**Request:**
+
+```json
+{
+  "note": "Verificación completada, cheque en camino"
+}
+```
+
+### GET /admin/alarms/thresholds/:taxCaseId
+
+Obtiene umbrales de alarma personalizados para un caso.
+
+### PATCH /admin/alarms/thresholds/:taxCaseId
+
+Configura umbrales personalizados para un caso.
+
+**Request:**
+
+```json
+{
+  "federalInProcessDays": 30,
+  "stateInProcessDays": 60,
+  "disableFederalAlarms": false,
+  "reason": "Cliente notificó demora esperada"
+}
+```
+
+### POST /admin/alarms/sync/:taxCaseId
+
+Sincroniza/evalúa alarmas para un caso específico.
+
+---
+
+## 5.12 Audit Logs (Admin) - NUEVO v0.6
+
+### GET /admin/audit-logs
+
+Lista logs de auditoría con filtros.
+
+**Query params:** `action`, `userId`, `startDate`, `endDate`, `limit`, `cursor`
+
+**Response:**
+
+```json
+{
+  "logs": [
+    {
+      "id": "uuid",
+      "action": "PASSWORD_CHANGE",
+      "userId": "uuid",
+      "targetUserId": "uuid",
+      "details": { "changedFields": ["password"] },
+      "ipAddress": "192.168.1.1",
+      "userAgent": "Mozilla/5.0...",
+      "createdAt": "datetime"
+    }
+  ],
+  "nextCursor": "string"
+}
+```
+
+### GET /admin/audit-logs/actions
+
+Lista tipos de acciones disponibles.
+
+### GET /admin/audit-logs/stats
+
+Estadísticas de auditoría por período.
+
+### GET /admin/audit-logs/export
+
+Exporta logs a CSV con filtros aplicados.
+
+### GET /admin/audit-logs/user/:userId
+
+Logs de auditoría para un usuario específico.
+
+---
+
+## 5.13 Health Check
+
+### GET /health
+
+Health check básico con status y uptime.
+
+### GET /health/detailed
+
+Health check detallado con memoria y versión de Node.
+
 ---
 
 # 6. USER FLOWS
@@ -1386,7 +1866,7 @@ export const environment = {
 };
 ```
 
-## 11.3 Estado de Implementación (Enero 2026 - v0.3)
+## 11.3 Estado de Implementación (Enero 2026 - v0.6)
 
 ### Stack Tecnológico en Producción
 
@@ -1395,9 +1875,10 @@ export const environment = {
 | **Backend**       | NestJS + Prisma ORM           | Railway  |
 | **Base de datos** | PostgreSQL                    | Supabase |
 | **Frontend**      | Angular 21                    | Vercel   |
-| **Autenticación** | JWT + Google OAuth            | —        |
+| **Autenticación** | JWT + Google OAuth + Refresh Tokens | —  |
 | **Storage**       | Supabase Buckets              | —        |
 | **IA**            | OpenAI Vision API             | —        |
+| **Monitoring**    | Sentry                        | —        |
 
 ### URLs de Producción
 
@@ -1406,9 +1887,9 @@ export const environment = {
 
 ### Módulos Backend
 
-`auth · users · clients · documents · tickets · notifications · webhooks · calculator · referrals · progress`
+`auth · users · clients · documents · tickets · notifications · webhooks · calculator · referrals · progress · alarms · audit-logs · health · storage-cleanup`
 
-### Features en Producción (v0.5)
+### Features en Producción (v0.6)
 
 - ☑ Registro y login (cliente + admin)
 - ☑ Login con Google OAuth
@@ -1437,6 +1918,39 @@ export const environment = {
   - Soft-delete support for notifications
   - Financial validation constraints
   - Referral expiration job improvements
+- ☑ **Status System v2 (v0.6):**
+  - Unified CaseStatus (awaiting_form → taxes_filed → case_issues)
+  - Enhanced FederalStatusNew (8 detailed statuses)
+  - Enhanced StateStatusNew (8 detailed statuses)
+  - PreFilingStatus for pre-filing workflow
+  - Phase-based workflow (taxesFiled flag)
+  - Status change timestamps per track
+- ☑ **Alarm System (v0.6):**
+  - AlarmThreshold per tax case (custom or global defaults)
+  - AlarmHistory with resolution workflow
+  - Alarm types: verification delays, letter timeouts
+  - Alarm levels: warning, critical
+  - Auto-resolve when status changes
+  - Admin dashboard for active alarms
+- ☑ **Audit Logs (v0.6):**
+  - Track security events (password changes, failed logins)
+  - Track financial events (refund updates, discounts)
+  - Track document deletions
+  - IP address and user agent logging
+  - Admin CSV export
+- ☑ **Refresh Token System (v0.6):**
+  - Secure token rotation with hash storage
+  - Device info and IP tracking
+  - Token revocation and replacement chain
+  - Logout from all devices support
+- ☑ **i18n / Multi-language (v0.6):**
+  - User language preference (preferredLanguage)
+  - Spanish/English support
+  - Automatic notification translation
+- ☑ **System Settings (v0.6):**
+  - Key-value configuration store
+  - Admin-managed settings
+  - Audit trail for setting changes
 
 ### Pendiente (Próximas Fases)
 
@@ -1551,7 +2065,29 @@ Y veo mi posición si estoy en el ranking
 | DiscountApplication: Add unique constraint   | ✅ Completo |
 | Financial: Add CHECK constraints (>=0)       | ✅ Completo |
 
-## Próximas Fases (v0.6+)
+## Cronograma v0.6 (17 Enero 2026) - COMPLETADO
+
+| Tarea                                        | Estado      |
+| -------------------------------------------- | ----------- |
+| Status System v2: CaseStatus enum            | ✅ Completo |
+| Status System v2: FederalStatusNew enum      | ✅ Completo |
+| Status System v2: StateStatusNew enum        | ✅ Completo |
+| Status System v2: PreFilingStatus workflow   | ✅ Completo |
+| Status System v2: Phase-based taxesFiled     | ✅ Completo |
+| Alarm System: AlarmThreshold model           | ✅ Completo |
+| Alarm System: AlarmHistory model             | ✅ Completo |
+| Alarm System: Admin dashboard                | ✅ Completo |
+| Alarm System: Resolution workflow            | ✅ Completo |
+| Audit Logs: AuditLog model                   | ✅ Completo |
+| Audit Logs: Security tracking                | ✅ Completo |
+| Audit Logs: CSV export                       | ✅ Completo |
+| Refresh Tokens: Secure rotation              | ✅ Completo |
+| Refresh Tokens: Device tracking              | ✅ Completo |
+| i18n: preferredLanguage field                | ✅ Completo |
+| i18n: Notification translation               | ✅ Completo |
+| SystemSetting: Key-value store               | ✅ Completo |
+
+## Próximas Fases (v0.7+)
 
 | Tarea                                        | Prioridad   |
 | -------------------------------------------- | ----------- |
@@ -1567,63 +2103,88 @@ Y veo mi posición si estoy en el ranking
 
 # 14. GLOSARIO
 
-| Término          | Definición                                                                     |
-| ---------------- | ------------------------------------------------------------------------------ |
-| **W2**           | Formulario fiscal de EE.UU. que muestra ingresos y retenciones del empleador   |
-| **SSN**          | Social Security Number - Número de seguro social de EE.UU.                     |
-| **J-1**          | Tipo de visa de intercambio cultural (incluye Work & Travel)                   |
-| **Tax Refund**   | Devolución de impuestos retenidos en exceso                                    |
-| **IRS**          | Internal Revenue Service - Agencia tributaria de EE.UU.                        |
-| **F1**           | Formulario inicial con datos básicos (nombre, email, teléfono)                 |
-| **F2**           | Formulario completo con datos sensibles (SSN, banco, dirección)                |
-| **Make**         | Plataforma de automatización (antes Integromat)                                |
-| **Supabase**     | Plataforma BaaS con PostgreSQL y Storage                                       |
-| **Referidor**    | Usuario que comparte su código de referido (v0.3)                              |
-| **Referido**     | Usuario que se registra usando un código de referido (v0.3)                    |
-| **adminStep**    | Paso interno de control administrativo (1-5) (v0.3)                            |
-| **OAuth**        | Protocolo de autorización para login con terceros (Google) (v0.3)              |
+| Término              | Definición                                                                     |
+| -------------------- | ------------------------------------------------------------------------------ |
+| **W2**               | Formulario fiscal de EE.UU. que muestra ingresos y retenciones del empleador   |
+| **SSN**              | Social Security Number - Número de seguro social de EE.UU.                     |
+| **J-1**              | Tipo de visa de intercambio cultural (incluye Work & Travel)                   |
+| **Tax Refund**       | Devolución de impuestos retenidos en exceso                                    |
+| **IRS**              | Internal Revenue Service - Agencia tributaria de EE.UU.                        |
+| **F1**               | Formulario inicial con datos básicos (nombre, email, teléfono)                 |
+| **F2**               | Formulario completo con datos sensibles (SSN, banco, dirección)                |
+| **Make**             | Plataforma de automatización (antes Integromat)                                |
+| **Supabase**         | Plataforma BaaS con PostgreSQL y Storage                                       |
+| **Referidor**        | Usuario que comparte su código de referido (v0.3)                              |
+| **Referido**         | Usuario que se registra usando un código de referido (v0.3)                    |
+| **adminStep**        | Paso interno de control administrativo (1-5) (v0.3)                            |
+| **OAuth**            | Protocolo de autorización para login con terceros (Google) (v0.3)              |
+| **CaseStatus**       | Estado unificado del caso fiscal (v0.6)                                        |
+| **FederalStatusNew** | Estado detallado del tracking federal post-presentación (v0.6)                 |
+| **StateStatusNew**   | Estado detallado del tracking estatal post-presentación (v0.6)                 |
+| **PreFilingStatus**  | Estado del caso antes de presentar impuestos (v0.6)                            |
+| **taxesFiled**       | Flag que indica si los impuestos fueron presentados (v0.6)                     |
+| **AlarmThreshold**   | Umbral de tiempo para disparar alarmas por caso (v0.6)                         |
+| **AlarmHistory**     | Historial de alarmas disparadas con resolución (v0.6)                          |
+| **AuditLog**         | Registro de acciones de seguridad y cambios críticos (v0.6)                    |
+| **RefreshToken**     | Token de renovación para mantener sesión activa (v0.6)                         |
+| **i18n**             | Internacionalización - soporte multi-idioma (v0.6)                             |
 
 ---
 
 # 15. APÉNDICES
 
-## A. Diagrama de Base de Datos (ER) - Actualizado v0.3
+## A. Diagrama de Base de Datos (ER) - Actualizado v0.6
 
 ```
-┌──────────────────┐       ┌────────────────┐       ┌──────────────┐
-│      users       │       │ client_profiles│       │  tax_cases   │
-├──────────────────┤       ├────────────────┤       ├──────────────┤
-│ id (PK)          │◄──────│ user_id (FK)   │       │ id (PK)      │
-│ email            │       │ id (PK)        │◄──────│ client_id(FK)│
-│ password_hash    │       │ ssn (encrypted)│       │ tax_year     │
-│ role             │       │ date_of_birth  │       │ internal_stat│
-│ first_name       │       │ address_*      │       │ client_status│
-│ last_name        │       │ bank_*         │       │ federal_stat │
-│ phone            │       │ work_state     │       │ state_status │
-│ google_id (v0.3) │       │ employer_name  │       │ admin_step   │
-│ referral_code    │       │ turbotax_*     │       │ has_problem  │
-│ referred_by_code │       │ profile_complete       │ problem_*    │
-│ created_at       │       │ is_draft       │       │ fed_deposit  │
-└──────────────────┘       └────────────────┘       │ state_deposit│
-        │                                           └──────────────┘
-        │                                                  │
-        ▼                                                  ▼
-┌──────────────┐       ┌──────────────┐       ┌──────────────┐
-│   tickets    │       │  documents   │       │ w2_estimates │
-└──────────────┘       └──────────────┘       │   (v0.3)     │
-        │                                     └──────────────┘
-        ▼
-┌──────────────┐       ┌──────────────┐       ┌──────────────┐
-│ticket_messages       │  referrals   │       │ discount_    │
-└──────────────┘       │   (v0.3)     │       │ applications │
-                       ├──────────────┤       │   (v0.3)     │
-┌──────────────┐       │ id (PK)      │       └──────────────┘
-│notifications │       │ referrer_id  │
-└──────────────┘       │ referred_id  │
-                       │ status       │
-┌──────────────┐       │ completed_at │
-│status_history│       └──────────────┘
-└──────────────┘
+┌──────────────────┐       ┌────────────────┐       ┌──────────────────┐
+│      users       │       │ client_profiles│       │    tax_cases     │
+├──────────────────┤       ├────────────────┤       ├──────────────────┤
+│ id (PK)          │◄──────│ user_id (FK)   │       │ id (PK)          │
+│ email            │       │ id (PK)        │◄──────│ client_id(FK)    │
+│ password_hash    │       │ ssn (encrypted)│       │ tax_year         │
+│ role             │       │ date_of_birth  │       │ taxes_filed      │
+│ first_name       │       │ address_*      │       │ pre_filing_status│
+│ last_name        │       │ irs_username   │       │ case_status (v0.6)
+│ phone            │       │ irs_password   │       │ federal_status_new
+│ profile_picture  │       │ state_username │       │ state_status_new │
+│ google_id        │       │ state_password │       │ admin_step       │
+│ referral_code    │       │ turbotax_*     │       │ has_problem      │
+│ token_version    │       │ profile_complete       │ problem_*        │
+│ preferred_lang   │       │ is_draft       │       │ fed_deposit_date │
+└──────────────────┘       └────────────────┘       │ state_deposit_date
+        │                                           └──────────────────┘
+        │                                                    │
+        ▼                                                    ▼
+┌──────────────┐       ┌──────────────┐       ┌────────────────────┐
+│   tickets    │       │  documents   │       │   alarm_history    │
+│ (soft-delete)│       │ uploaded_by  │       │      (v0.6)        │
+└──────────────┘       └──────────────┘       ├────────────────────┤
+        │                     │               │ alarm_type         │
+        ▼                     ▼               │ alarm_level        │
+┌──────────────┐       ┌──────────────┐       │ resolution         │
+│ticket_messages       │ w2_estimates │       │ resolved_by        │
+│ (soft-delete)│       │ ocr_raw_resp │       └────────────────────┘
+└──────────────┘       └──────────────┘
+                                              ┌────────────────────┐
+┌──────────────┐       ┌──────────────┐       │  alarm_thresholds  │
+│notifications │       │  referrals   │       │      (v0.6)        │
+│ (soft-delete)│       ├──────────────┤       ├────────────────────┤
+│ is_archived  │       │ referrer_id  │       │ federal_days       │
+└──────────────┘       │ referred_id  │       │ state_days         │
+                       │ status       │       │ verification_days  │
+┌──────────────┐       │ completed_at │       │ letter_days        │
+│status_history│       └──────────────┘       └────────────────────┘
+└──────────────┘              │
+                              ▼               ┌────────────────────┐
+┌──────────────┐       ┌──────────────┐       │    audit_logs      │
+│refresh_tokens│       │ discount_    │       │      (v0.6)        │
+│   (v0.6)     │       │ applications │       ├────────────────────┤
+├──────────────┤       └──────────────┘       │ action             │
+│ token_hash   │                              │ user_id            │
+│ device_info  │       ┌──────────────┐       │ target_user_id     │
+│ ip_address   │       │system_settings       │ ip_address         │
+│ is_revoked   │       │   (v0.6)     │       │ user_agent         │
+└──────────────┘       └──────────────┘       └────────────────────┘
 ```
 
 ## B. Discount Tiers (v0.3)
@@ -1850,9 +2411,66 @@ Migrations:
 
 ---
 
-# 19. PRÓXIMOS PASOS (v0.6+)
+# 19. STATUS SYSTEM v2 & ALARM SYSTEM (v0.6)
 
-## 19.1 Admin Panel Improvements (Prioridad Alta)
+## 19.1 Status System v2 Overview
+
+La versión 0.6 introduce un sistema de estados completamente renovado que reemplaza el sistema anterior con una estructura más clara basada en fases.
+
+### Cambios Principales
+
+1. **Separación de Fases**: El campo `taxesFiled` (boolean) separa claramente pre-filing y post-filing.
+2. **CaseStatus Unificado**: Estado general del caso visible para admins.
+3. **FederalStatusNew/StateStatusNew**: Estados detallados independientes para tracking federal y estatal.
+4. **PreFilingStatus**: Estados específicos antes de presentar impuestos.
+5. **Timestamps por Track**: Cada cambio de estado se registra con su timestamp.
+
+### Migración desde Sistema Anterior
+
+Los campos legacy (`internalStatus`, `clientStatus`) se mantienen para compatibilidad pero el nuevo sistema usa:
+- `caseStatus` para estado general
+- `federalStatusNew` para tracking federal
+- `stateStatusNew` para tracking estatal
+- `preFilingStatus` cuando `taxesFiled = false`
+
+## 19.2 Alarm System Overview
+
+El sistema de alarmas monitorea automáticamente casos que llevan demasiado tiempo en ciertos estados.
+
+### Componentes
+
+1. **AlarmThreshold**: Configuración de umbrales por caso (o globales)
+2. **AlarmHistory**: Registro de todas las alarmas disparadas
+3. **AlarmType**: Tipos de alarma (verification, letter_sent, etc.)
+4. **AlarmLevel**: warning o critical
+5. **AlarmResolution**: Estado de resolución (active, acknowledged, resolved, auto_resolved)
+
+### Flujo de Alarmas
+
+```
+1. Sistema evalúa casos → 2. Detecta exceso de tiempo
+                              ↓
+3. Crea AlarmHistory → 4. Admin ve en dashboard
+                              ↓
+5. Admin acknowledges → 6. Admin resuelve con nota
+      o
+   Status cambia → Auto-resolve
+```
+
+### Default Thresholds
+
+| Alarma | Días |
+|--------|------|
+| Federal in_process | 25 |
+| State in_process | 50 |
+| Verification timeout | 63 |
+| Letter sent timeout | 63 |
+
+---
+
+# 20. PRÓXIMOS PASOS (v0.7+)
+
+## 20.1 Admin Panel Improvements (Prioridad Alta)
 
 El panel de administración necesita mejoras significativas para la temporada 2026:
 
@@ -1880,10 +2498,10 @@ El panel de administración necesita mejoras significativas para la temporada 20
 - [ ] Referrals pendientes/exitosos
 - [ ] Gráficos de progreso temporal
 
-## 19.2 Testing (Prioridad Alta)
+## 20.2 Testing (Prioridad Alta)
 
 ### Backend Tests
-- [ ] Unit tests para services (auth, users, clients, referrals)
+- [ ] Unit tests para services (auth, users, clients, referrals, alarms, audit-logs)
 - [ ] Integration tests para controllers
 - [ ] Mock de Prisma y servicios externos
 
@@ -1903,4 +2521,4 @@ El panel de administración necesita mejoras significativas para la temporada 20
 
 _Este PRD debe ser usado como referencia única para el desarrollo del Portal JAI1. Cualquier cambio debe ser documentado y versionado._
 
-_Versión 0.5 - Última actualización: 13 de Enero, 2026 (noche)_
+_Versión 0.6 - Última actualización: 17 de Enero, 2026_
