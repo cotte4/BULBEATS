@@ -6,9 +6,9 @@
 
 ---
 
-| **Versión**                    | 0.6 - Status System v2 & Alarm System    |
-| ------------------------------ | ---------------------------------------- |
-| **Fecha Última Actualización** | 17 de Enero, 2026                        |
+| **Versión**                    | 0.9 - Visual Review & Refund Confirmation |
+| ------------------------------ | ----------------------------------------- |
+| **Fecha Última Actualización** | 27 de Enero, 2026                         |
 | **Fecha Creación**             | 27 de Diciembre, 2024                    |
 | **Deadline MVP**               | 10 de Enero, 2025                        |
 | **Inicio Temporada**           | 28 de Enero, 2025 (Temporada Fiscal USA) |
@@ -71,10 +71,9 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
     - Financial validation: CHECK constraints for non-negative amounts
 24. ✅ **Status System v2 (v0.6)** - COMPLETADO
     - Unified CaseStatus enum (awaiting_form, awaiting_docs, preparing, taxes_filed, case_issues)
-    - Enhanced FederalStatusNew tracking (8 estados detallados)
-    - Enhanced StateStatusNew tracking (8 estados detallados)
-    - PreFilingStatus enum for pre-filing workflow
-    - Phase-based workflow (taxesFiled flag separates pre/post filing)
+    - Enhanced FederalStatusNew tracking (9 estados detallados)
+    - Enhanced StateStatusNew tracking (9 estados detallados)
+    - Phase-based workflow (caseStatus === taxes_filed separates pre/post filing)
     - Complete status change timestamps per track
 25. ✅ **Alarm System (v0.6)** - COMPLETADO
     - AlarmThreshold per tax case (custom or global defaults)
@@ -102,20 +101,84 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
     - Key-value configuration store
     - Admin-managed settings
     - Audit trail for setting changes
+30. ✅ **V1→V2 Status Migration Complete (v0.7)** - COMPLETADO
+    - Removed V1 enums from database (TaxStatus, PreFilingStatus)
+    - Removed V1 columns (pre_filing_status, federal_status, state_status)
+    - Added DEPOSIT_PENDING status to FederalStatusNew and StateStatusNew
+    - All queries now use V2 fields exclusively (caseStatus, federalStatusNew, stateStatusNew)
+    - Backfill migration executed: all existing data migrated to V2
+    - Backup table created: _backup_v1_status_20250124
+    - V1 fields (taxesFiled, taxesFiledAt) kept for referral code generation only
+    - Frontend fully migrated: admin panel uses V2 exclusively
+    - Backend fully migrated: all services and queries use V2
+31. ✅ **API Sync & Type Generation (v0.8)** - COMPLETADO
+    - Centralized pagination constants (PAGINATION_LIMITS) - no more magic numbers
+    - Standardized response wrapper DTOs (PaginatedResponseDto, etc.)
+    - Full Swagger/OpenAPI decorators on all DTOs (@ApiProperty, @ApiPropertyOptional)
+    - Controller documentation (@ApiTags, @ApiOperation, @ApiResponse)
+    - Automatic OpenAPI spec export (openapi.json)
+    - ng-openapi-gen integration for frontend type generation
+    - 39 models and 14 services auto-generated from backend DTOs
+    - `npm run generate:api` to sync frontend types from backend
+32. ✅ **Visual Review System (v0.9)** - COMPLETADO
+    - Gamified 4-step document verification flow
+    - Step 1: Client form data review (SSN, name, DOB, address, employer)
+    - Step 2: W2 verification with bento grid layout (50/50 split)
+      - LEFT: Client data panel + W2 key fields checklist (Box 2, Box 17, estimated refund)
+      - RIGHT: Document preview with zoom, rotate, fullscreen, download
+      - W2 document selector for multiple W2s
+      - OCR confidence badge from calculator
+    - Step 3: Payment proof review (document list + preview)
+    - Step 4: Consent form review (document list + preview)
+    - Final decision screen (Accept / Problem Detected)
+    - Celebration animation on successful verification
+    - Progress indicator (1/4, 2/4, etc.)
+33. ✅ **Refund Confirmation System (v0.9)** - COMPLETADO
+    - Client can confirm when they received their refund
+    - Separate confirmation for federal and state tracks
+    - Updates actual refund amounts (federalActualRefund, stateActualRefund)
+    - Records deposit dates (federalDepositDate, stateDepositDate)
+    - Client-facing UI in tax tracking section
+34. ✅ **Commission Payment Tracking (v0.9)** - COMPLETADO
+    - Admin view of unpaid commissions per client
+    - Checkbox to mark commission as paid
+    - commissionPaid flag on TaxCase model
+    - commissionPaidAt timestamp for audit trail
+35. ✅ **Engineer Status System Improvements (v0.9)** - COMPLETADO
+    - Auto-transition to documentos_enviados when 4 items complete:
+      - Tax form submitted (profileComplete && !isDraft)
+      - W2 document uploaded
+      - Payment proof uploaded
+      - Consent form signed
+    - Status tooltips/descriptions in admin dropdown UI
+    - Auto-calculated Fecha Estimada on taxes_filed:
+      - Federal: filing date + 6 weeks
+      - State: filing date + 9 weeks
+    - Monto Real entry guidance (only enter when confirmed)
+    - Removed IRS_VERIFICATION from ProblemType enum
+    - Auto-resolve problems on positive status progression
+    - Verification handled via status (in_verification) not problem flags
 
 ### ⏳ Pendiente (Próximas prioridades):
 
-1. **Admin Panel Improvements** (Prioridad Alta)
-   - Revisión completa de funcionalidades admin
-   - UI/UX improvements para gestión de clientes
-   - Bulk actions para operaciones masivas
-   - Filtros avanzados y búsqueda
-   - Dashboard de métricas admin
+1. **Admin Panel Polish** (Prioridad Media)
+   - ✅ Visual review system implemented
+   - ✅ Status system improvements implemented
+   - ✅ Commission tracking implemented
+   - ☐ Bulk actions para operaciones masivas
+   - ☐ Filtros avanzados en lista de clientes
+   - ☐ Dashboard de métricas admin (charts, KPIs)
+   - ☐ Export reports (CSV/PDF)
 
 2. **Testing** (Prioridad Alta)
    - Tests unitarios backend (services)
    - Tests de integración (API endpoints)
    - Tests E2E frontend (flujos críticos)
+
+3. **Performance & Polish** (Prioridad Baja)
+   - Reducir CSS bundle size (actualmente 90kb, budget 80kb)
+   - Lazy loading de componentes no críticos
+   - Image optimization
 
 ### ❌ Funcionalidades EXCLUIDAS del MVP (Fase 2+):
 
@@ -157,9 +220,13 @@ portal-jai1-frontend/
 ├── src/
 │   ├── app/
 │   │   ├── core/                    # ✅ Servicios singleton, guards, interceptors
+│   │   │   ├── api/                 # ✅ NUEVO v0.8 - Generated API types from OpenAPI
+│   │   │   │   ├── models/          # Auto-generated DTOs (39 models)
+│   │   │   │   ├── fn/              # Auto-generated API functions
+│   │   │   │   └── services/        # Auto-generated API services (14 services)
 │   │   │   ├── guards/
 │   │   │   ├── interceptors/
-│   │   │   ├── models/              # ✅ Interfaces TypeScript
+│   │   │   ├── models/              # ✅ Frontend-only interfaces
 │   │   │   └── services/
 │   │   │       ├── auth.service.ts
 │   │   │       ├── profile.service.ts
@@ -209,7 +276,9 @@ portal-jai1-backend/
 │   ├── main.ts                      # ✅ Punto de entrada
 │   ├── app.module.ts                # ✅ Módulo raíz
 │   ├── common/                      # ✅ Elementos compartidos IMPLEMENTADOS
+│   │   ├── constants/               # ✅ NUEVO v0.8 - Pagination limits, config
 │   │   ├── decorators/              # ✅ @CurrentUser, @Roles
+│   │   ├── dto/                     # ✅ NUEVO v0.8 - Shared DTOs (PaginatedResponse)
 │   │   ├── filters/                 # ✅ HTTP exception filter
 │   │   ├── guards/                  # ✅ JWT auth guard, Roles guard
 │   │   ├── interceptors/            # ✅ Interceptores
@@ -243,7 +312,7 @@ portal-jai1-backend/
 │           ├── progress.module.ts
 │           └── progress-automation.service.ts
 ├── prisma/
-│   └── schema.prisma                # ✅ Schema completo (actualizado v0.3)
+│   └── schema.prisma                # ✅ Schema completo (actualizado v0.7 - V2 only)
 ├── scripts/
 │   └── create-admin.ts              # ✅ Script para crear admin
 ├── package.json
@@ -254,12 +323,18 @@ portal-jai1-backend/
 
 # 3. MODELOS DE DATOS
 
-## 3.1 Prisma Schema (Actualizado v0.6)
+## 3.1 Prisma Schema (Actualizado v0.7)
+
+**Nota v0.7 - V2 Status Migration Complete:**
+- V1 status enums REMOVED: `TaxStatus`, `PreFilingStatus`
+- V1 columns REMOVED: `pre_filing_status`, `federal_status`, `state_status`
+- V2 is now SOURCE OF TRUTH: `caseStatus`, `federalStatusNew`, `stateStatusNew`
+- NEW status: `DEPOSIT_PENDING` added to FederalStatusNew and StateStatusNew
+- Backup table: `_backup_v1_status_20250124` contains V1 data for reference
 
 **Nota v0.6:**
 - Todos los campos ID y FK usan tipo nativo PostgreSQL UUID con `@db.Uuid`
 - Timestamps usan `@db.Timestamptz` para soporte de timezone
-- Sistema de estados v2 con CaseStatus, FederalStatusNew, StateStatusNew
 - Sistema de alarmas con AlarmThreshold y AlarmHistory
 - Audit logs para tracking de seguridad
 - Refresh tokens con rotación segura
@@ -283,54 +358,42 @@ enum UserRole {
   admin
 }
 
-// Legacy status enums (for backward compatibility)
-enum TaxStatus {
-  filed
-  pending
-  processing
-  approved
-  rejected
-  deposited
-}
+// NOTE v0.7: V1 enums (TaxStatus, PreFilingStatus) have been REMOVED from database
+// All status tracking now uses V2 system exclusively
 
-// Pre-filing workflow status (before taxes are filed)
-enum PreFilingStatus {
-  awaiting_registration
-  awaiting_documents
-  documentation_complete
-}
-
-// NEW v0.6: Unified case status (replaces old status combination)
+// Unified case status (pre-filing workflow)
 enum CaseStatus {
-  awaiting_form
-  awaiting_docs
-  preparing
-  taxes_filed
-  case_issues
+  awaiting_form      // Waiting for tax form completion
+  awaiting_docs      // Waiting for document uploads
+  preparing          // Documents ready, preparing filing
+  taxes_filed        // Taxes submitted to IRS
+  case_issues        // Case has problems requiring attention
 }
 
-// NEW v0.6: Enhanced federal status tracking
+// Enhanced federal status tracking (post-filing)
 enum FederalStatusNew {
-  in_process
-  in_verification
-  verification_in_progress
-  verification_letter_sent
-  check_in_transit
-  issues
-  taxes_sent
-  taxes_completed
+  in_process                  // Initial processing
+  in_verification             // Under IRS verification
+  verification_in_progress    // Active verification
+  verification_letter_sent    // Letter sent to client
+  check_in_transit            // Check mailed
+  deposit_pending             // Bank deposit approved, awaiting receipt (NEW v0.7)
+  issues                      // Problems with federal return
+  taxes_sent                  // Refund sent
+  taxes_completed             // Refund received/completed
 }
 
-// NEW v0.6: Enhanced state status tracking
+// Enhanced state status tracking (post-filing)
 enum StateStatusNew {
-  in_process
-  in_verification
-  verification_in_progress
-  verification_letter_sent
-  check_in_transit
-  issues
-  taxes_sent
-  taxes_completed
+  in_process                  // Initial processing
+  in_verification             // Under state verification
+  verification_in_progress    // Active verification
+  verification_letter_sent    // Letter sent to client
+  check_in_transit            // Check mailed
+  deposit_pending             // Bank deposit approved, awaiting receipt (NEW v0.7)
+  issues                      // Problems with state return
+  taxes_sent                  // Refund sent
+  taxes_completed             // Refund received/completed
 }
 
 enum DocumentType {
@@ -378,15 +441,21 @@ enum OcrConfidence {
   low
 }
 
+// Payment method for refund delivery
+enum PaymentMethod {
+  bank_deposit    // Direct deposit to bank account
+  check           // Paper check mailed
+}
+
 enum ProblemType {
   missing_documents
   incorrect_information
-  irs_verification
   bank_issue
   state_issue
   federal_issue
   client_unresponsive
   other
+  // NOTE v0.9: irs_verification REMOVED - verification handled via status, not problem flags
 }
 
 // NEW v0.6: Alarm System Enums
@@ -542,16 +611,17 @@ model TaxCase {
   clientProfileId    String          @map("client_profile_id") @db.Uuid
   taxYear            Int             @map("tax_year")  // CHECK: 2020-2100
 
-  // Phase indicator - separates pre-filing and post-filing workflows
+  // Legacy flags - kept for referral code generation only
   taxesFiled         Boolean         @default(false) @map("taxes_filed")
   taxesFiledAt       DateTime?       @map("taxes_filed_at") @db.Timestamptz
 
-  // Pre-filing status (used when taxesFiled = false)
-  preFilingStatus    PreFilingStatus @default(awaiting_registration) @map("pre_filing_status")
+  // NOTE v0.7: V1 columns REMOVED from database:
+  // - pre_filing_status (PreFilingStatus enum)
+  // - federal_status (TaxStatus enum)
+  // - state_status (TaxStatus enum)
+  // Backup available in: _backup_v1_status_20250124
 
-  // Legacy status fields (deprecated, kept for migration)
-  federalStatus      TaxStatus?      @map("federal_status")
-  stateStatus        TaxStatus?      @map("state_status")
+  // Refund tracking
   estimatedRefund    Decimal?        @map("estimated_refund") @db.Decimal(10, 2)
 
   // Separate federal/state tracking (SOURCE OF TRUTH)
@@ -562,26 +632,26 @@ model TaxCase {
   federalDepositDate    DateTime?    @map("federal_deposit_date") @db.Timestamptz
   stateDepositDate      DateTime?    @map("state_deposit_date") @db.Timestamptz
 
-  // Federal status tracking (comments and dates) - NEW v0.6
+  // Federal status tracking (comments and dates)
   federalLastComment      String?    @map("federal_last_comment")
   federalStatusChangedAt  DateTime?  @map("federal_status_changed_at") @db.Timestamptz
   federalLastReviewedAt   DateTime?  @map("federal_last_reviewed_at") @db.Timestamptz
 
-  // State status tracking (comments and dates) - NEW v0.6
+  // State status tracking (comments and dates)
   stateLastComment        String?    @map("state_last_comment")
   stateStatusChangedAt    DateTime?  @map("state_status_changed_at") @db.Timestamptz
   stateLastReviewedAt     DateTime?  @map("state_last_reviewed_at") @db.Timestamptz
 
-  // ============= STATUS SYSTEM v2 (NEW v0.6) =============
-  // Unified case status
+  // ============= STATUS SYSTEM v2 (SOURCE OF TRUTH) =============
+  // Unified case status (pre-filing workflow)
   caseStatus            CaseStatus?       @map("case_status")
   caseStatusChangedAt   DateTime?         @map("case_status_changed_at") @db.Timestamptz
 
-  // Enhanced federal status (new system)
+  // Federal status (post-filing tracking)
   federalStatusNew          FederalStatusNew?  @map("federal_status_new")
   federalStatusNewChangedAt DateTime?          @map("federal_status_new_changed_at") @db.Timestamptz
 
-  // Enhanced state status (new system)
+  // State status (post-filing tracking)
   stateStatusNew            StateStatusNew?    @map("state_status_new")
   stateStatusNewChangedAt   DateTime?          @map("state_status_new_changed_at") @db.Timestamptz
 
@@ -595,6 +665,7 @@ model TaxCase {
   bankName           String?         @map("bank_name")
   bankRoutingNumber  String?         @map("bank_routing_number")
   bankAccountNumber  String?         @map("bank_account_number")
+  paymentMethod      PaymentMethod   @default(bank_deposit) @map("payment_method")
 
   statusUpdatedAt    DateTime        @default(now()) @map("status_updated_at") @db.Timestamptz
 
@@ -2468,35 +2539,28 @@ El sistema de alarmas monitorea automáticamente casos que llevan demasiado tiem
 
 ---
 
-# 20. PRÓXIMOS PASOS (v0.7+)
+# 20. PRÓXIMOS PASOS (v0.9+)
 
-## 20.1 Admin Panel Improvements (Prioridad Alta)
+## 20.1 Admin Panel Improvements
 
-El panel de administración necesita mejoras significativas para la temporada 2026:
+El panel de administración ha recibido mejoras significativas en v0.9:
 
-### UI/UX Review
-- [ ] Auditar todas las pantallas admin
-- [ ] Mejorar navegación y flujos de trabajo
-- [ ] Optimizar para operaciones frecuentes
+### ✅ Completado en v0.9
+- [x] Visual Review System (4-step gamified verification)
+- [x] Bento grid layout for W2 verification
+- [x] Status system UI improvements with tooltips
+- [x] Commission payment tracking
+- [x] Auto-transition logic for document completion
+- [x] Auto-calculated estimated dates
+- [x] Problem auto-resolution on status change
 
-### Bulk Actions
-- [ ] Selección múltiple de clientes
+### ⏳ Pendiente
+- [ ] Selección múltiple de clientes (bulk actions)
 - [ ] Cambio de estado masivo
 - [ ] Envío de notificaciones masivas
-- [ ] Export masivo de datos
-
-### Filtros y Búsqueda
-- [ ] Filtro por estado (internal_status, client_status)
-- [ ] Filtro por fecha de registro
-- [ ] Filtro por problema (has_problem)
-- [ ] Búsqueda por nombre, email, SSN
-- [ ] Ordenamiento por columnas
-
-### Dashboard Métricas
-- [ ] Total clientes por estado
-- [ ] Clientes con problemas activos
-- [ ] Referrals pendientes/exitosos
-- [ ] Gráficos de progreso temporal
+- [ ] Export masivo de datos (CSV/PDF reports)
+- [ ] Filtros avanzados en lista de clientes
+- [ ] Dashboard de métricas con gráficos
 
 ## 20.2 Testing (Prioridad Alta)
 
@@ -2517,8 +2581,252 @@ El panel de administración necesita mejoras significativas para la temporada 20
 
 ---
 
+# 21. API SYNC & TYPE GENERATION (v0.8)
+
+## 21.1 Overview
+
+The API Sync system ensures frontend TypeScript types are always in sync with backend DTOs through automatic code generation from OpenAPI specifications.
+
+## 21.2 Pagination Constants
+
+Centralized pagination limits in `src/common/constants/pagination.constants.ts`:
+
+```typescript
+export const PAGINATION_LIMITS = {
+  CLIENTS: { DEFAULT: 20, MAX: 1000 },
+  ACCOUNTS: { DEFAULT: 50, MAX: 500 },
+  PAYMENTS: { DEFAULT: 50, MAX: 500 },
+  DELAYS: { DEFAULT: 50, MAX: 500 },
+  TICKETS: { DEFAULT: 20, MAX: 100 },
+  NOTIFICATIONS: { DEFAULT: 20, MAX: 100 },
+  REFERRALS: { DEFAULT: 50, MAX: 1000 },
+  REFERRALS_SUMMARY: { DEFAULT: 50, MAX: 100 },
+  LEADERBOARD: { DEFAULT: 10, MAX: 100 },
+  AUDIT_LOGS: { DEFAULT: 50, MAX: 100 },
+} as const;
+```
+
+Helper functions: `validateLimit()`, `validatePage()`, `validateOffset()`
+
+## 21.3 Response DTOs
+
+Standard response wrappers in `src/common/dto/`:
+
+- `PaginatedResponseDto<T>` - Cursor-based pagination
+- `OffsetPaginatedResponseDto<T>` - Offset-based pagination
+- `SuccessResponseDto` - Generic success response
+- `ErrorResponseDto` - Error response wrapper
+
+Entity-specific response DTOs:
+- `AuthResponseDto`, `RegisterResponseDto`, `LogoutResponseDto`
+- `TicketsPaginatedResponseDto`, `TicketDetailDto`
+- `NotificationsPaginatedResponseDto`, `UnreadCountResponseDto`
+- `ClientsPaginatedResponseDto`, `ClientListItemDto`
+
+## 21.4 Swagger Decorators
+
+All DTOs now include `@ApiProperty` and `@ApiPropertyOptional` decorators with:
+- Description
+- Example values
+- Enum constraints
+- Nested type references
+
+All controllers include:
+- `@ApiTags()` - Group endpoints by feature
+- `@ApiOperation()` - Describe endpoint purpose
+- `@ApiResponse()` - Document response types
+- `@ApiBearerAuth()` - Mark authenticated endpoints
+
+## 21.5 OpenAPI Generation
+
+Backend automatically exports `openapi.json` on startup (dev mode).
+
+```bash
+# Backend - generates openapi.json
+npm run start:dev
+```
+
+## 21.6 Frontend Type Generation
+
+Configuration in `ng-openapi-gen.json`:
+
+```json
+{
+  "input": "../portal-jai1-backend/openapi.json",
+  "output": "src/app/core/api",
+  "enumStyle": "alias",
+  "servicePrefix": "Api",
+  "serviceSuffix": "Service"
+}
+```
+
+```bash
+# Frontend - generate types from OpenAPI spec
+npm run generate:api
+```
+
+Generated files in `src/app/core/api/`:
+- `models/` - 39 TypeScript interfaces (DTOs)
+- `fn/` - API function implementations
+- `services/` - 14 Angular services (by controller)
+
+## 21.7 Usage
+
+```typescript
+// Import generated types
+import { LoginDto, AuthResponseDto } from '../api/models';
+import { ApiAuthService } from '../api/services';
+
+// Types are always in sync with backend
+```
+
+## 21.8 Workflow
+
+1. Modify backend DTO (add field, change type)
+2. Restart backend (generates new openapi.json)
+3. Run `npm run generate:api` in frontend
+4. Frontend types are updated automatically
+
+---
+
+# 22. VISUAL REVIEW & REFUND CONFIRMATION (v0.9)
+
+## 22.1 Visual Review System
+
+### Purpose
+Provides a gamified, step-by-step document verification flow for admins to quickly review client submissions.
+
+### 4-Step Flow
+
+```
+Step 1          Step 2              Step 3              Step 4
+┌─────────┐    ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ Client  │    │ W2 Verification │  │ Payment Proof   │  │ Consent Form    │
+│ Form    │ → │ (Bento Grid)    │ → │ Review          │ → │ Review          │
+│ Review  │    │                 │  │                 │  │                 │
+└─────────┘    └─────────────────┘  └─────────────────┘  └─────────────────┘
+     ↓                ↓                    ↓                    ↓
+  ✓ CORRECTO      ✓ CORRECTO          ✓ CORRECTO          Final Decision
+                                                         Accept / Problem
+```
+
+### Step 2: Bento Grid Layout
+
+The W2 verification step uses a special 50/50 bento grid layout:
+
+```
+┌────────────────────────┬────────────────────────┐
+│   Datos del Cliente    │                        │
+│   • SSN (with copy)    │   W2 Document Preview  │
+│   • Nombre             │   • Zoom controls      │
+│   • Direccion          │   • Rotate (images)    │
+│   • Empleador          │   • Fullscreen         │
+│   • Estado Trabajo     │   • Download           │
+├────────────────────────┤                        │
+│   Campos Clave W2      │   [Document selector   │
+│   ☐ Box 2: Federal Tax │    for multiple W2s]   │
+│   ☐ Box 17: State Tax  │                        │
+│   ☐ Reembolso Estimado │                        │
+│   OCR Confidence badge │                        │
+└────────────────────────┴────────────────────────┘
+        LEFT (50%)              RIGHT (50%)
+```
+
+### Steps 3 & 4: Document + Preview Layout
+
+```
+┌────────────────────────┬────────────────────────┐
+│   Document List        │   Document Preview     │
+│   • File 1             │   (just the document)  │
+│   • File 2             │                        │
+│   Click to view →      │   [Toolbar]            │
+└────────────────────────┴────────────────────────┘
+        LEFT                      RIGHT
+```
+
+### W2 Estimate API
+
+Backend endpoint: `GET /clients/:id/w2-estimate`
+
+Returns OCR-extracted W2 data:
+```json
+{
+  "hasEstimate": true,
+  "estimate": {
+    "box2Federal": 1234.56,
+    "box17State": 567.89,
+    "estimatedRefund": 1802.45,
+    "ocrConfidence": "high"
+  }
+}
+```
+
+## 22.2 Refund Confirmation System
+
+### Client Flow
+1. Client sees "Confirmar Recepcion" button when status is `taxes_sent` or `check_in_transit`
+2. Client enters actual amount received
+3. System updates:
+   - `federalActualRefund` or `stateActualRefund`
+   - `federalDepositDate` or `stateDepositDate`
+   - Status to `taxes_completed`
+
+### Admin View
+- Can see confirmed vs unconfirmed refunds
+- Commission tracking based on confirmed refunds
+
+## 22.3 Commission Payment Tracking
+
+### TaxCase Fields
+```prisma
+commissionPaid     Boolean    @default(false)
+commissionPaidAt   DateTime?
+```
+
+### Admin Flow
+1. View list of clients with unpaid commissions
+2. Filter by commission status
+3. Mark individual commissions as paid
+4. System records payment timestamp
+
+## 22.4 Engineer Status System Improvements
+
+### Auto-Transition Logic
+When all 4 items are complete, auto-transition to `documentos_enviados`:
+1. ✓ Tax form submitted (profileComplete && !isDraft)
+2. ✓ W2 document uploaded
+3. ✓ Payment proof uploaded
+4. ✓ Consent form signed
+
+Triggered from:
+- Document upload service
+- Consent form signing service
+- Profile completion service
+
+### Auto-Calculated Estimated Dates
+On `taxes_filed` transition:
+- `federalEstimatedDate` = filing date + 6 weeks (42 days)
+- `stateEstimatedDate` = filing date + 9 weeks (63 days)
+
+Only sets if not already manually set.
+
+### Problem Auto-Resolution
+When status progresses to positive states (`deposit_pending`, `check_in_transit`, `taxes_sent`, `taxes_completed`):
+- `hasProblem` set to false
+- `problemResolvedAt` set to now
+- `problemType` and `problemDescription` cleared
+
+### Status Tooltips
+Admin dropdowns show helpful descriptions:
+- `in_verification`: "El IRS está revisando el caso"
+- `deposit_pending`: "Depósito aprobado, esperando confirmación del banco"
+- `check_in_transit`: "Cheque físico enviado por correo"
+- etc.
+
+---
+
 **FIN DEL DOCUMENTO**
 
 _Este PRD debe ser usado como referencia única para el desarrollo del Portal JAI1. Cualquier cambio debe ser documentado y versionado._
 
-_Versión 0.6 - Última actualización: 17 de Enero, 2026_
+_Versión 0.9 - Última actualización: 27 de Enero, 2026_
