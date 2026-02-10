@@ -6,12 +6,13 @@
 
 ---
 
-| **Versión**                    | 0.9 - Visual Review & Refund Confirmation |
+| **Versión**                    | 1.0 - Production Launch |
 | ------------------------------ | ----------------------------------------- |
-| **Fecha Última Actualización** | 27 de Enero, 2026                         |
+| **Fecha Última Actualización** | 9 de Febrero, 2026                        |
 | **Fecha Creación**             | 27 de Diciembre, 2024                    |
 | **Deadline MVP**               | 10 de Enero, 2025                        |
 | **Inicio Temporada**           | 28 de Enero, 2025 (Temporada Fiscal USA) |
+| **Clientes Reales**            | 21 clientes importados (temporada 2025)  |
 | **Clientes Esperados**         | 200 clientes (temporada 2026)            |
 
 ---
@@ -158,6 +159,42 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
     - Removed IRS_VERIFICATION from ProblemType enum
     - Auto-resolve problems on positive status progression
     - Verification handled via status (in_verification) not problem flags
+36. ✅ **Status System v2 Final (v1.0)** - COMPLETADO
+    - Renamed all status enums to Spanish for client-facing consistency
+    - FederalStatusNew: taxes_en_proceso, en_verificacion, verificacion_en_progreso, problemas, verificacion_rechazada, deposito_directo, cheque_en_camino, comision_pendiente, taxes_completados
+    - StateStatusNew: same 9 statuses as federal
+    - CaseStatus: awaiting_form, awaiting_docs, documentos_enviados, preparing, taxes_filed, case_issues
+    - Removed DEPOSIT_PENDING, verification_letter_sent (replaced by Spanish equivalents)
+    - Removed old V1 backup table
+37. ✅ **Commission Proof System (v1.0)** - COMPLETADO
+    - Dual-track commission proof: federal and state tracked separately
+    - Client uploads payment receipt (commission_proof_federal, commission_proof_state DocumentTypes)
+    - Admin reviews proof: reviewedBy, reviewedAt, reviewNote fields per track
+    - Per-track commission rates: federalCommissionRate, stateCommissionRate (11% normal, 22% verification)
+    - Commission paid tracking: federalCommissionPaid, stateCommissionPaid with timestamps
+38. ✅ **Consent Form System (v1.0)** - COMPLETADO
+    - ConsentFormStatus enum (pending, signed) on TaxCase
+    - Consent form upload, signing timestamp, storage path
+    - consent_form DocumentType for uploads
+    - Auto-transition to documentos_enviados when consent signed + W2 + payment proof + profile complete
+39. ✅ **JAI1GENT Referral Program (v1.0)** - COMPLETADO
+    - New UserRole: jai1gent (alongside client, admin)
+    - Jai1gentInviteCode: Admin-generated 8-char invite codes for JAI1GENT registration
+    - Jai1gentProfile: Referral code (JAI + 3 name + 4 random), payment info (bank_transfer/zelle)
+    - Jai1gentReferral: Per-referral tracking with commission calculation
+    - Denormalized stats: totalReferrals, completedReferrals, totalEarnings, paidEarnings
+40. ✅ **RAG Knowledge Base (v1.0)** - COMPLETADO
+    - KnowledgeChunk model with pgvector embeddings (1536 dimensions)
+    - Section-based content organization for chatbot RAG
+    - OpenAI integration for embedding generation
+41. ✅ **Production Data Migration (v1.0)** - COMPLETADO
+    - Wiped all test data from Supabase
+    - Imported 21 real clients from manual spreadsheet
+    - 10 clients with taxes filed (status: taxes_en_proceso)
+    - 11 clients in various pre-filing stages
+    - All sensitive data encrypted (AES-256-GCM): SSN, TurboTax creds, bank info, addresses
+    - Admin account created: jai@memas.agency
+    - All clients have temporary password for first login
 
 ### ⏳ Pendiente (Próximas prioridades):
 
@@ -323,14 +360,22 @@ portal-jai1-backend/
 
 # 3. MODELOS DE DATOS
 
-## 3.1 Prisma Schema (Actualizado v0.7)
+## 3.1 Prisma Schema (Actualizado v1.0)
 
-**Nota v0.7 - V2 Status Migration Complete:**
+**Nota v1.0 - Production Launch:**
+- Status enums renamed to Spanish for client-facing consistency
+- JAI1GENT referral program: new role, profiles, invite codes, per-referral tracking
+- Commission proof system: dual-track proof submission and admin review
+- Consent form tracking on TaxCase
+- KnowledgeChunk model for RAG chatbot with pgvector
+- Email verification fields on User
+- Internal comments on StatusHistory and TaxCase
+- 21 real clients imported, all test data wiped
+
+**Nota v0.7:**
 - V1 status enums REMOVED: `TaxStatus`, `PreFilingStatus`
 - V1 columns REMOVED: `pre_filing_status`, `federal_status`, `state_status`
 - V2 is now SOURCE OF TRUTH: `caseStatus`, `federalStatusNew`, `stateStatusNew`
-- NEW status: `DEPOSIT_PENDING` added to FederalStatusNew and StateStatusNew
-- Backup table: `_backup_v1_status_20250124` contains V1 data for reference
 
 **Nota v0.6:**
 - Todos los campos ID y FK usan tipo nativo PostgreSQL UUID con `@db.Uuid`
@@ -356,50 +401,61 @@ datasource db {
 enum UserRole {
   client
   admin
+  jai1gent    // NEW v1.0 - JAI1GENT referral agents
 }
 
 // NOTE v0.7: V1 enums (TaxStatus, PreFilingStatus) have been REMOVED from database
 // All status tracking now uses V2 system exclusively
 
-// Unified case status (pre-filing workflow)
+// Unified case status (pre-filing workflow) - UPDATED v1.0
 enum CaseStatus {
-  awaiting_form      // Waiting for tax form completion
-  awaiting_docs      // Waiting for document uploads
-  preparing          // Documents ready, preparing filing
-  taxes_filed        // Taxes submitted to IRS
-  case_issues        // Case has problems requiring attention
+  awaiting_form        // Waiting for tax form completion
+  awaiting_docs        // Waiting for document uploads
+  documentos_enviados  // NEW v1.0 - All docs submitted, ready for review
+  preparing            // Documents ready, preparing filing
+  taxes_filed          // Taxes submitted to IRS
+  case_issues          // Case has problems requiring attention
 }
 
-// Enhanced federal status tracking (post-filing)
+// Federal status tracking (post-filing) - RENAMED v1.0 to Spanish
 enum FederalStatusNew {
-  in_process                  // Initial processing
-  in_verification             // Under IRS verification
-  verification_in_progress    // Active verification
-  verification_letter_sent    // Letter sent to client
-  check_in_transit            // Check mailed
-  deposit_pending             // Bank deposit approved, awaiting receipt (NEW v0.7)
-  issues                      // Problems with federal return
-  taxes_sent                  // Refund sent
-  taxes_completed             // Refund received/completed
+  taxes_en_proceso          // Initial processing by IRS
+  en_verificacion           // Under IRS verification
+  verificacion_en_progreso  // Active verification process
+  problemas                 // Problems with federal return
+  verificacion_rechazada    // Verification rejected
+  deposito_directo          // Direct deposit sent
+  cheque_en_camino          // Check mailed to client
+  comision_pendiente        // Refund received, awaiting commission payment
+  taxes_completados         // Process fully completed
 }
 
-// Enhanced state status tracking (post-filing)
+// State status tracking (post-filing) - RENAMED v1.0 to Spanish
 enum StateStatusNew {
-  in_process                  // Initial processing
-  in_verification             // Under state verification
-  verification_in_progress    // Active verification
-  verification_letter_sent    // Letter sent to client
-  check_in_transit            // Check mailed
-  deposit_pending             // Bank deposit approved, awaiting receipt (NEW v0.7)
-  issues                      // Problems with state return
-  taxes_sent                  // Refund sent
-  taxes_completed             // Refund received/completed
+  taxes_en_proceso          // Initial processing by state
+  en_verificacion           // Under state verification
+  verificacion_en_progreso  // Active verification process
+  problemas                 // Problems with state return
+  verificacion_rechazada    // Verification rejected
+  deposito_directo          // Direct deposit sent
+  cheque_en_camino          // Check mailed to client
+  comision_pendiente        // Refund received, awaiting commission payment
+  taxes_completados         // Process fully completed
 }
 
 enum DocumentType {
   w2
   payment_proof
+  consent_form                // NEW v1.0
+  commission_proof_federal    // NEW v1.0
+  commission_proof_state      // NEW v1.0
   other
+}
+
+// NEW v1.0: Consent form signing status
+enum ConsentFormStatus {
+  pending
+  signed
 }
 
 enum TicketStatus {
@@ -476,16 +532,21 @@ enum AlarmResolution {
   acknowledged
   resolved
   auto_resolved
+  dismissed       // NEW v1.0
 }
 
-// NEW v0.6: Audit Log Actions
+// Audit Log Actions (UPDATED v1.0)
 enum AuditAction {
   PASSWORD_CHANGE
   PASSWORD_RESET
+  CREDENTIALS_ACCESS    // NEW v1.0 - Track admin credential reveals
   DOCUMENT_DELETE
   REFUND_UPDATE
   DISCOUNT_APPLIED
   LOGIN_FAILED
+  PROFILE_UPDATE        // NEW v1.0
+  SSN_CHANGE            // NEW v1.0
+  BANK_INFO_CHANGE      // NEW v1.0
 }
 
 // ============= MODELS =============
@@ -506,13 +567,18 @@ model User {
   updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   resetToken            String?   @map("reset_token")
   resetTokenExpiresAt   DateTime? @map("reset_token_expires_at") @db.Timestamptz
-  tokenVersion          Int       @default(1) @map("token_version")  // NEW v0.6
-  preferredLanguage     String    @default("es") @map("preferred_language") @db.VarChar(5)  // NEW v0.6
+  tokenVersion          Int       @default(1) @map("token_version")
+  // Email verification - NEW v1.0
+  emailVerified              Boolean   @default(false) @map("email_verified")
+  verificationToken          String?   @map("verification_token")
+  verificationTokenExpiresAt DateTime? @map("verification_token_expires_at") @db.Timestamptz
+  preferredLanguage     String    @default("es") @map("preferred_language") @db.VarChar(5)
 
   // Referral program fields
   referralCode          String?   @unique @map("referral_code")
   referredByCode        String?   @map("referred_by_code")
   referralCodeCreatedAt DateTime? @map("referral_code_created_at") @db.Timestamptz
+  referralOnboardingCompleted Boolean @default(false) @map("referral_onboarding_completed") // NEW v1.0
 
   // Relations
   clientProfile         ClientProfile?
@@ -592,6 +658,9 @@ model ClientProfile {
   // Profile status
   profileComplete   Boolean   @default(false) @map("profile_complete")
   isDraft           Boolean   @default(true) @map("is_draft")
+  // Computed status fields for efficient querying (NEW v1.0)
+  isReadyToPresent  Boolean   @default(false) @map("is_ready_to_present")
+  isIncomplete      Boolean   @default(true) @map("is_incomplete")
 
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -603,6 +672,8 @@ model ClientProfile {
   @@index([profileComplete])
   @@index([isDraft])
   @@index([createdAt])
+  @@index([isReadyToPresent])    // NEW v1.0
+  @@index([isIncomplete])        // NEW v1.0
   @@map("client_profiles")
 }
 
@@ -642,6 +713,10 @@ model TaxCase {
   stateStatusChangedAt    DateTime?  @map("state_status_changed_at") @db.Timestamptz
   stateLastReviewedAt     DateTime?  @map("state_last_reviewed_at") @db.Timestamptz
 
+  // Internal comments (admin-only, never shown to clients) - NEW v1.0
+  federalInternalComment  String?    @map("federal_internal_comment")
+  stateInternalComment    String?    @map("state_internal_comment")
+
   // ============= STATUS SYSTEM v2 (SOURCE OF TRUTH) =============
   // Unified case status (pre-filing workflow)
   caseStatus            CaseStatus?       @map("case_status")
@@ -658,6 +733,31 @@ model TaxCase {
   // Payment tracking
   paymentReceived    Boolean         @default(false) @map("payment_received")
   commissionPaid     Boolean         @default(false) @map("commission_paid")
+  // Refund receipt confirmation (client confirms they received money) - NEW v1.0
+  federalRefundReceived     Boolean    @default(false) @map("federal_refund_received")
+  stateRefundReceived       Boolean    @default(false) @map("state_refund_received")
+  federalRefundReceivedAt   DateTime?  @map("federal_refund_received_at") @db.Timestamptz
+  stateRefundReceivedAt     DateTime?  @map("state_refund_received_at") @db.Timestamptz
+  // Separate commission paid tracking per track - NEW v1.0
+  federalCommissionPaid     Boolean    @default(false) @map("federal_commission_paid")
+  stateCommissionPaid       Boolean    @default(false) @map("state_commission_paid")
+  federalCommissionPaidAt   DateTime?  @map("federal_commission_paid_at") @db.Timestamptz
+  stateCommissionPaidAt     DateTime?  @map("state_commission_paid_at") @db.Timestamptz
+  // Commission proof submission tracking - NEW v1.0
+  federalCommissionProofSubmitted    Boolean?  @default(false)
+  federalCommissionProofSubmittedAt  DateTime?
+  stateCommissionProofSubmitted      Boolean?  @default(false)
+  stateCommissionProofSubmittedAt    DateTime?
+  // Commission proof review tracking (admin) - NEW v1.0
+  federalCommissionProofReviewedBy   String?   @db.Uuid
+  federalCommissionProofReviewedAt   DateTime?
+  federalCommissionProofReviewNote   String?
+  stateCommissionProofReviewedBy     String?   @db.Uuid
+  stateCommissionProofReviewedAt     DateTime?
+  stateCommissionProofReviewNote     String?
+  // Per-track commission rates (11% normal, 22% verification) - NEW v1.0
+  federalCommissionRate     Decimal    @default(0.11) @db.Decimal(3, 2)
+  stateCommissionRate       Decimal    @default(0.11) @db.Decimal(3, 2)
 
   // Year-specific employment and banking info (SOURCE OF TRUTH)
   workState          String?         @map("work_state")
@@ -668,6 +768,10 @@ model TaxCase {
   paymentMethod      PaymentMethod   @default(bank_deposit) @map("payment_method")
 
   statusUpdatedAt    DateTime        @default(now()) @map("status_updated_at") @db.Timestamptz
+  // Consent form tracking - NEW v1.0
+  consentFormStatus       ConsentFormStatus  @default(pending) @map("consent_form_status")
+  consentFormSignedAt     DateTime?          @map("consent_form_signed_at") @db.Timestamptz
+  consentFormStoragePath  String?            @map("consent_form_storage_path")
 
   // Admin step control: 1=Registration, 2=W2 Uploaded, 3=Tax Form Complete, 4=IRS Review, 5=Finalized
   adminStep          Int?            @map("admin_step")
@@ -698,9 +802,11 @@ model TaxCase {
   @@index([hasProblem])
   @@index([createdAt])
   @@index([taxesFiled])
-  @@index([preFilingStatus])
-  @@index([taxesFiled, preFilingStatus])
   @@index([taxesFiled, createdAt])
+  // Composite indexes for status queries - NEW v1.0
+  @@index([caseStatus, federalStatusNew, stateStatusNew])
+  @@index([hasProblem, federalStatusNew, stateStatusNew])
+  @@index([consentFormStatus])
   // Indexes for alarm queries (status system v2)
   @@index([caseStatus])
   @@index([federalStatusNew])
@@ -784,6 +890,7 @@ model StatusHistory {
   newStatus      String   @map("new_status")
   changedById    String?  @map("changed_by_id") @db.Uuid
   comment        String?
+  internalComment String?  @map("internal_comment")  // NEW v1.0 - admin-only
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
@@ -994,6 +1101,83 @@ model SystemSetting {
 
   @@index([updatedBy])
   @@map("system_settings")
+}
+
+// ============= JAI1GENT REFERRAL PROGRAM (NEW v1.0) =============
+
+enum Jai1gentPaymentMethod {
+  bank_transfer
+  zelle
+}
+
+enum Jai1gentReferralStatus {
+  pending           // Client registered but not filed
+  taxes_filed       // Client has filed taxes
+  completed         // Commission earned
+  expired           // No activity after timeout
+}
+
+// Admin-generated invite codes for JAI1GENT registration
+model Jai1gentInviteCode {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique @db.VarChar(8)
+  createdById String    @map("created_by_id") @db.Uuid
+  usedById    String?   @unique @map("used_by_id") @db.Uuid
+  usedAt      DateTime? @map("used_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  @@map("jai1gent_invite_codes")
+}
+
+// JAI1GENT profile with referral and payment info
+model Jai1gentProfile {
+  id                  String    @id @default(uuid()) @db.Uuid
+  userId              String    @unique @map("user_id") @db.Uuid
+  referralCode        String    @unique @map("referral_code") @db.VarChar(10)  // JAI + 3 name + 4 random
+  paymentMethod       Jai1gentPaymentMethod?
+  bankName            String?
+  bankRoutingNumber   String?
+  bankAccountNumber   String?
+  zelleEmail          String?
+  zellePhone          String?
+  // Denormalized stats
+  totalReferrals      Int       @default(0)
+  completedReferrals  Int       @default(0)
+  totalEarnings       Decimal   @default(0) @db.Decimal(10, 2)
+  paidEarnings        Decimal   @default(0) @db.Decimal(10, 2)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  @@map("jai1gent_profiles")
+}
+
+// Per-referral tracking for JAI1GENTs
+model Jai1gentReferral {
+  id                  String    @id @default(uuid()) @db.Uuid
+  jai1gentProfileId   String    @map("jai1gent_profile_id") @db.Uuid
+  referredUserId      String    @unique @map("referred_user_id") @db.Uuid
+  referralCode        String    @map("referral_code")
+  status              Jai1gentReferralStatus @default(pending)
+  jai1Fee             Decimal?  @db.Decimal(10, 2)
+  commissionPercent   Decimal?  @db.Decimal(5, 2)
+  commissionAmount    Decimal?  @db.Decimal(10, 2)
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  @@map("jai1gent_referrals")
+}
+
+// ============= KNOWLEDGE BASE / RAG (NEW v1.0) =============
+
+// Knowledge chunks for chatbot RAG (pgvector for embeddings)
+model KnowledgeChunk {
+  id        String   @id @default(uuid()) @db.Uuid
+  section   String   @db.VarChar(200)
+  content   String
+  // embedding vector(1536) - handled via raw SQL (pgvector)
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  @@index([section])
+  @@map("knowledge_chunks")
 }
 ```
 
@@ -1937,7 +2121,7 @@ export const environment = {
 };
 ```
 
-## 11.3 Estado de Implementación (Enero 2026 - v0.6)
+## 11.3 Estado de Implementación (Febrero 2026 - v1.0)
 
 ### Stack Tecnológico en Producción
 
@@ -1958,9 +2142,9 @@ export const environment = {
 
 ### Módulos Backend
 
-`auth · users · clients · documents · tickets · notifications · webhooks · calculator · referrals · progress · alarms · audit-logs · health · storage-cleanup`
+`auth · users · clients · documents · tickets · notifications · webhooks · calculator · referrals · progress · alarms · audit-logs · health · storage-cleanup · consent-form · jai1gents · knowledge-base`
 
-### Features en Producción (v0.6)
+### Features en Producción (v1.0)
 
 - ☑ Registro y login (cliente + admin)
 - ☑ Login con Google OAuth
@@ -2023,9 +2207,24 @@ export const environment = {
   - Admin-managed settings
   - Audit trail for setting changes
 
+## Cronograma v1.0 (9 Febrero 2026) - COMPLETADO
+
+- ☑ **Status System v2 Final:** Renamed all enums to Spanish (taxes_en_proceso, etc.)
+- ☑ **Commission Proof System:** Dual-track proof submission + admin review
+- ☑ **Consent Form System:** ConsentFormStatus enum, auto-transition logic
+- ☑ **JAI1GENT Referral Program:** New role, profiles, invite codes, referral tracking
+- ☑ **RAG Knowledge Base:** pgvector embeddings for chatbot
+- ☑ **Email Verification:** emailVerified, verificationToken fields
+- ☑ **Enhanced Audit Logging:** CREDENTIALS_ACCESS, PROFILE_UPDATE, SSN_CHANGE, BANK_INFO_CHANGE
+- ☑ **Production Data Migration:**
+  - Wiped all test data from Supabase
+  - Imported 21 real clients from manual spreadsheet
+  - All sensitive data encrypted (AES-256-GCM)
+  - Admin account: jai@memas.agency
+
 ### Pendiente (Próximas Fases)
 
-- ☐ **Admin Panel Improvements** (Prioridad Alta)
+- ☐ **Admin Panel Polish** (Prioridad Media) — bulk actions, advanced filters, dashboard metrics
 - ☐ **Tests automatizados** (Prioridad Alta)
 
 ---
@@ -2539,20 +2738,22 @@ El sistema de alarmas monitorea automáticamente casos que llevan demasiado tiem
 
 ---
 
-# 20. PRÓXIMOS PASOS (v0.9+)
+# 20. PRÓXIMOS PASOS (v1.0+)
 
 ## 20.1 Admin Panel Improvements
 
-El panel de administración ha recibido mejoras significativas en v0.9:
-
-### ✅ Completado en v0.9
+### ✅ Completado (v0.9-v1.0)
 - [x] Visual Review System (4-step gamified verification)
 - [x] Bento grid layout for W2 verification
 - [x] Status system UI improvements with tooltips
-- [x] Commission payment tracking
+- [x] Commission payment tracking (dual-track with proof)
 - [x] Auto-transition logic for document completion
 - [x] Auto-calculated estimated dates
 - [x] Problem auto-resolution on status change
+- [x] Consent form tracking
+- [x] Commission proof submission and admin review
+- [x] Internal comments (admin-only, hidden from clients)
+- [x] JAI1GENT referral program management
 
 ### ⏳ Pendiente
 - [ ] Selección múltiple de clientes (bulk actions)
