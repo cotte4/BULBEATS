@@ -331,3 +331,43 @@ select {
   margin: 1rem 0;
   filter: drop-shadow(0 0 5px var(--color-blood));
 }
+
+/* SAVE TOAST ANIMATION */
+@keyframes toastSlideIn {
+  0% { opacity: 0; transform: translate(-50%, -20px) scale(0.9); }
+  15% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  30% { transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(0.95); }
+}
+
+.save-toast {
+  animation: toastSlideIn 1.2s ease-out forwards;
+}
+
+/* SWIPE HINT PULSE */
+@keyframes swipeHintPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.swipe-hint-pulse {
+  animation: swipeHintPulse 2.5s ease-in-out infinite;
+}
+
+/* RESPONSIVE: Genre page text */
+@media (max-width: 480px) {
+  .diablo-logo {
+    font-size: 2.2rem !important;
+    letter-spacing: 2px;
+  }
+
+  .genre-card span.text-5xl {
+    font-size: 2.5rem;
+  }
+
+  select {
+    max-width: 160px !important;
+    font-size: 0.65rem;
+  }
+}

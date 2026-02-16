@@ -3,8 +3,10 @@ import { SwipeCard } from './SwipeCard';
 import { SwipeButtons } from './SwipeButtons';
 import { useSwipeStore } from '../stores/useSwipeStore';
 import { useFavoritesStore } from '../stores/useFavoritesStore';
+import { useUserStore } from '../stores/useUserStore';
 import { filterBeatsByChannel, getUniqueChannels } from '../lib/youtube';
-import { useState, useMemo } from 'react';
+import { castVote } from '../lib/firestore';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 export function SwipeView() {
   const {
@@ -21,7 +23,9 @@ export function SwipeView() {
     canLoadMore,
   } = useSwipeStore();
   const { addFavorite, isFavorite } = useFavoritesStore();
+  const { usernameSlug, username } = useUserStore();
   const [selectedChannel, setSelectedChannel] = useState<string>('All Channels');
+  const [showSaveToast, setShowSaveToast] = useState(false);
 
   // Get unique channels from loaded beats
   const channels = useMemo(() => {
@@ -36,20 +40,28 @@ export function SwipeView() {
   const currentBeat = filteredBeats[currentIndex] || null;
   const hasMore = currentIndex < filteredBeats.length - 1;
 
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
+    if (currentBeat && usernameSlug && username) {
+      castVote(currentBeat, 'dislike', usernameSlug, username).catch(() => {});
+    }
     if (hasMore) {
       nextBeat();
     }
-  };
+  }, [currentBeat, hasMore, nextBeat, usernameSlug, username]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (currentBeat) {
       addFavorite(currentBeat);
+      if (usernameSlug && username) {
+        castVote(currentBeat, 'like', usernameSlug, username).catch(() => {});
+      }
+      setShowSaveToast(true);
+      setTimeout(() => setShowSaveToast(false), 1200);
       if (hasMore) {
         nextBeat();
       }
     }
-  };
+  }, [currentBeat, hasMore, addFavorite, nextBeat, usernameSlug, username]);
 
   const handleSwipeLeft = () => {
     handleSkip();
@@ -68,6 +80,19 @@ export function SwipeView() {
   const handleLoadMore = async () => {
     await loadMore();
   };
+
+  // Keyboard support: Arrow Left = skip, Arrow Right = save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        handleSkip();
+      } else if (e.key === 'ArrowRight') {
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSkip, handleSave]);
 
   // Reset channel filter when it results in no beats
   const handleResetFilter = () => {
@@ -248,6 +273,18 @@ export function SwipeView() {
         onSave={handleSave}
         isSaved={isFavorite(currentBeat.videoId)}
       />
+
+      {/* Save toast notification */}
+      {showSaveToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 save-toast">
+          <div className="px-6 py-3 bg-neon/90 text-black font-bold uppercase tracking-wider text-sm
+                          flex items-center gap-2 border-2 border-neon glow-neon">
+            <Flame className="w-4 h-4" />
+            Guardado!
+            <Flame className="w-4 h-4" />
+          </div>
+        </div>
+      )}
 
       {/* Progress indicator */}
       <div className="text-center pb-4 relative z-10">

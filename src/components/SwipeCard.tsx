@@ -25,18 +25,20 @@ export function SwipeCard({ beat, onSwipeLeft, onSwipeRight }: SwipeCardProps) {
     setDragX(diff);
   };
 
+  const SWIPE_THRESHOLD = 75;
+
   const handleDragEnd = () => {
     if (!isDragging) return;
     setIsDragging(false);
 
-    if (dragX > 100) {
+    if (dragX > SWIPE_THRESHOLD) {
       setIsExiting('right');
       setTimeout(() => {
         onSwipeRight();
         setDragX(0);
         setIsExiting(null);
       }, 300);
-    } else if (dragX < -100) {
+    } else if (dragX < -SWIPE_THRESHOLD) {
       setIsExiting('left');
       setTimeout(() => {
         onSwipeLeft();
@@ -87,14 +89,14 @@ export function SwipeCard({ beat, onSwipeLeft, onSwipeRight }: SwipeCardProps) {
                        border-l-[40px] border-l-transparent z-10" />
         <Flame className="absolute top-1 right-1 w-4 h-4 text-white z-20" />
 
-        {/* SKIP indicator */}
+        {/* SKIP indicator — lower threshold (no -0.3 offset) */}
         <div
           className="absolute top-8 left-4 z-20 px-5 py-2 bg-black/90
                      text-blood font-bold text-2xl uppercase tracking-wider
                      transform -rotate-12 border-4 border-blood pointer-events-none
                      flex items-center gap-2"
           style={{
-            opacity: Math.max(0, -dragX / 100 - 0.3),
+            opacity: Math.max(0, -dragX / 100),
             boxShadow: '0 0 20px rgba(255, 0, 51, 0.5)',
           }}
         >
@@ -102,14 +104,14 @@ export function SwipeCard({ beat, onSwipeLeft, onSwipeRight }: SwipeCardProps) {
           SKIP
         </div>
 
-        {/* SAVE indicator */}
+        {/* SAVE indicator — lower threshold (no -0.3 offset) */}
         <div
           className="absolute top-8 right-4 z-20 px-5 py-2 bg-black/90
                      text-neon font-bold text-2xl uppercase tracking-wider
                      transform rotate-12 border-4 border-neon pointer-events-none
                      flex items-center gap-2"
           style={{
-            opacity: Math.max(0, dragX / 100 - 0.3),
+            opacity: Math.max(0, dragX / 100),
             boxShadow: '0 0 20px rgba(57, 255, 20, 0.5)',
           }}
         >
@@ -170,12 +172,20 @@ export function SwipeCard({ beat, onSwipeLeft, onSwipeRight }: SwipeCardProps) {
             )}
           </div>
 
-          {/* Swipe hint */}
-          <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest flex items-center justify-center gap-2 relative z-10">
-            <span className="text-blood">←</span>
-            Swipea aqui
-            <span className="text-neon">→</span>
-          </p>
+          {/* Swipe hint with idle labels */}
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <span className="text-blood/40 text-xs uppercase tracking-widest font-bold swipe-hint-pulse">
+              ← SKIP
+            </span>
+            <p className="text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
+              <span className="text-blood">←</span>
+              Swipea aqui
+              <span className="text-neon">→</span>
+            </p>
+            <span className="text-neon/40 text-xs uppercase tracking-widest font-bold swipe-hint-pulse">
+              SAVE →
+            </span>
+          </div>
 
           {/* Title */}
           <h2 className="text-lg font-bold text-white line-clamp-2 mb-1 uppercase tracking-wide relative z-10">

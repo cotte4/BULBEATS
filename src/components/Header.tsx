@@ -1,16 +1,21 @@
-import { Heart, ArrowLeft, Flame, Skull } from 'lucide-react';
+import { Heart, ArrowLeft, Flame, Skull, Trophy } from 'lucide-react';
 
 interface HeaderProps {
-  view: 'genres' | 'swipe' | 'favorites';
+  view: 'genres' | 'swipe' | 'favorites' | 'rankings';
   onBack: () => void;
   onFavorites: () => void;
+  onRankings: () => void;
   favoritesCount: number;
   genre?: string;
 }
 
-export function Header({ view, onBack, onFavorites, favoritesCount, genre }: HeaderProps) {
+export function Header({ view, onBack, onFavorites, onRankings, favoritesCount, genre }: HeaderProps) {
   const showBackButton = view !== 'genres';
-  const title = view === 'favorites' ? 'TUS FAVORITOS' : genre || 'SWIPE BEATS';
+  const title = view === 'favorites'
+    ? 'TUS FAVORITOS'
+    : view === 'rankings'
+    ? 'RANKINGS'
+    : genre || 'SWIPE BEATS';
 
   return (
     <header className="sticky top-0 bg-background/90 backdrop-blur-md border-b-2 border-blood/30 z-40">
@@ -50,39 +55,50 @@ export function Header({ view, onBack, onFavorites, favoritesCount, genre }: Hea
             </div>
           </div>
 
-          {/* Right section - Favorites button */}
-          {view !== 'favorites' && (
-            <button
-              onClick={onFavorites}
-              className="group relative flex items-center gap-2 px-5 py-2.5
-                         bg-gradient-to-r from-blood/20 to-hot-pink/20
-                         border-2 border-blood/50 hover:border-blood
-                         transition-all duration-300 hover:glow-red
-                         transform hover:scale-105 active:scale-95"
-              style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)' }}
-            >
-              {/* Animated heart */}
-              <Heart className="w-5 h-5 text-blood fill-blood group-hover:scale-110
-                             transition-transform" />
+          {/* Right section - Action buttons */}
+          <div className="flex items-center gap-2">
+            {view !== 'rankings' && view !== 'favorites' && (
+              <button
+                onClick={onRankings}
+                className="group relative flex items-center gap-2 px-4 py-2.5
+                           bg-gradient-to-r from-gold/20 to-blood/20
+                           border-2 border-gold/50 hover:border-gold
+                           transition-all duration-300 hover:glow-red
+                           transform hover:scale-105 active:scale-95"
+                style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)' }}
+              >
+                <Trophy className="w-5 h-5 text-gold group-hover:scale-110 transition-transform" />
+              </button>
+            )}
 
-              {/* Count badge */}
-              {favoritesCount > 0 && (
-                <span className="text-white font-bold text-lg min-w-[1.5rem]">
-                  {favoritesCount}
-                </span>
-              )}
+            {view !== 'favorites' && view !== 'rankings' && (
+              <button
+                onClick={onFavorites}
+                className="group relative flex items-center gap-2 px-5 py-2.5
+                           bg-gradient-to-r from-blood/20 to-hot-pink/20
+                           border-2 border-blood/50 hover:border-blood
+                           transition-all duration-300 hover:glow-red
+                           transform hover:scale-105 active:scale-95"
+                style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)' }}
+              >
+                <Heart className="w-5 h-5 text-blood fill-blood group-hover:scale-110
+                               transition-transform" />
+                {favoritesCount > 0 && (
+                  <span className="text-white font-bold text-lg min-w-[1.5rem]">
+                    {favoritesCount}
+                  </span>
+                )}
+                {favoritesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 text-sm fire-emoji">🔥</span>
+                )}
+              </button>
+            )}
 
-              {/* Fire indicator when has favorites */}
-              {favoritesCount > 0 && (
-                <span className="absolute -top-1 -right-1 text-sm fire-emoji">🔥</span>
-              )}
-            </button>
-          )}
-
-          {/* Skull decoration for favorites view */}
-          {view === 'favorites' && (
-            <Skull className="w-6 h-6 text-blood" />
-          )}
+            {/* Skull decoration for favorites/rankings view */}
+            {(view === 'favorites' || view === 'rankings') && (
+              <Skull className="w-6 h-6 text-blood" />
+            )}
+          </div>
         </div>
       </div>
 

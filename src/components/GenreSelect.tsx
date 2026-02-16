@@ -1,11 +1,27 @@
-import { Flame, Skull, Zap } from 'lucide-react';
+import { Flame, Skull, Zap, Search } from 'lucide-react';
 import { GENRES } from '../types/genres';
+import { useState } from 'react';
 
 interface GenreSelectProps {
   onSelectGenre: (searchTerm: string) => void;
 }
 
 export function GenreSelect({ onSelectGenre }: GenreSelectProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = () => {
+    const trimmed = searchQuery.trim();
+    if (trimmed) {
+      onSelectGenre(trimmed);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Background effects */}
@@ -41,6 +57,44 @@ export function GenreSelect({ onSelectGenre }: GenreSelectProps) {
 
         {/* Warning tape decoration */}
         <div className="mt-6 h-2 w-64 mx-auto warning-stripes opacity-60" />
+      </div>
+
+      {/* Custom Search Bar */}
+      <div className="w-full max-w-md mb-8 relative z-10">
+        <div className="relative flex items-center"
+             style={{ transform: 'skewX(-3deg)' }}>
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blood/60 pointer-events-none"
+                    style={{ transform: 'skewX(3deg)' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Busca cualquier beat..."
+              className="w-full pl-12 pr-4 py-3.5 bg-surface border-2 border-blood/40
+                         text-white text-sm uppercase tracking-wider font-bold
+                         placeholder:text-gray-600 placeholder:normal-case placeholder:tracking-normal
+                         focus:outline-none focus:border-blood focus:glow-red
+                         transition-all"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            className="px-5 py-3.5 bg-blood/80 border-2 border-blood text-white font-bold
+                       uppercase tracking-wider text-sm hover:bg-blood transition-all
+                       hover:glow-red shrink-0"
+          >
+            <span style={{ transform: 'skewX(3deg)' }} className="flex items-center gap-1.5">
+              <Zap className="w-4 h-4 fill-white" />
+              Buscar
+            </span>
+          </button>
+        </div>
+        <p className="text-gray-600 text-xs mt-2 text-center tracking-wide"
+           style={{ transform: 'skewX(0deg)' }}>
+          Ej: "Metro Boomin type beat", "dark trap 140 bpm"
+        </p>
       </div>
 
       {/* Genre Grid */}

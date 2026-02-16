@@ -56,3 +56,15 @@ export const BPM_RANGES = [
 ] as const;
 
 export type BpmRange = typeof BPM_RANGES[number];
+
+export interface RankedBeat {
+  videoId: string;
+  title: string;
+  thumbnail: string;
+  channelTitle: string;
+  bpm?: number;
+  typeBeat?: string;
+  likes: number;
+  dislikes: number;
+  netVotes: number;
+}
