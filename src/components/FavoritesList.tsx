@@ -1,4 +1,4 @@
-import { Heart, Play, Square, Trash2, Skull, Flame, Zap, ExternalLink, Grid, List, User } from 'lucide-react';
+import { Heart, Play, Square, Trash2, Skull, Flame, ExternalLink, Grid, List, User } from 'lucide-react';
 import { useFavoritesStore } from '../stores/useFavoritesStore';
 import { useState, useMemo } from 'react';
 
