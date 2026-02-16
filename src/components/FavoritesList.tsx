@@ -1,4 +1,4 @@
-import { Heart, Play, Square, Trash2, Skull, Flame, ExternalLink, Grid, List, User } from 'lucide-react';
+import { Heart, Play, Square, Trash2, Skull, Flame, ExternalLink, Grid, List, User, Download } from 'lucide-react';
 import { useFavoritesStore } from '../stores/useFavoritesStore';
 import { useState, useMemo } from 'react';
 
@@ -26,6 +26,42 @@ export function FavoritesList() {
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [filterChannel, setFilterChannel] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [downloadStatus, setDownloadStatus] = useState<{ msg: string; type: 'loading' | 'error' } | null>(null);
+
+  const handleDownload = async (videoId: string, title: string) => {
+    setDownloadStatus({ msg: 'Preparando descarga...', type: 'loading' });
+    try {
+      const res = await fetch('https://api.cobalt.tools/api/json', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          isAudioOnly: true,
+          aFormat: 'mp3',
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'stream' || data.status === 'redirect') {
+        const link = document.createElement('a');
+        link.href = data.url;
+        link.download = `${title}.mp3`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setDownloadStatus(null);
+      } else {
+        setDownloadStatus({ msg: data.text || 'Error al descargar', type: 'error' });
+        setTimeout(() => setDownloadStatus(null), 3000);
+      }
+    } catch {
+      setDownloadStatus({ msg: 'Error de conexion', type: 'error' });
+      setTimeout(() => setDownloadStatus(null), 3000);
+    }
+  };
 
   // Unique channels from favorites
   const channels = useMemo(() => {
@@ -343,6 +379,17 @@ export function FavoritesList() {
                     <ExternalLink className="w-4 h-4 text-neon" />
                   </a>
 
+                  {/* Download MP3 */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDownload(beat.videoId, beat.title); }}
+                    className="p-2.5 bg-hot-pink/10 border border-hot-pink/30
+                               hover:bg-hot-pink/20 hover:border-hot-pink
+                               transition-all flex items-center justify-center"
+                    title="Descargar MP3"
+                  >
+                    <Download className="w-4 h-4 text-hot-pink" />
+                  </button>
+
                   {/* Delete button */}
                   <button
                     onClick={() => removeFavorite(beat.videoId)}
@@ -383,6 +430,21 @@ export function FavoritesList() {
         <span className="text-xs uppercase tracking-widest">Tu coleccion de fuego</span>
         <Skull className="w-4 h-4 text-blood/50" />
       </div>
+
+      {/* Download status toast */}
+      {downloadStatus && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className={`px-6 py-3 font-bold uppercase tracking-wider text-sm
+                          flex items-center gap-2 border-2 ${
+                            downloadStatus.type === 'loading'
+                              ? 'bg-neon/90 text-black border-neon glow-neon'
+                              : 'bg-blood/90 text-white border-blood glow-red'
+                          }`}>
+            {downloadStatus.type === 'loading' && <Flame className="w-4 h-4 animate-pulse" />}
+            {downloadStatus.msg}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Flame, ThumbsUp, ThumbsDown, Skull, ExternalLink } from 'lucide-react';
+import { Flame, ThumbsUp, ThumbsDown, Skull, ExternalLink, Download } from 'lucide-react';
 import { getRankedBeats } from '../lib/firestore';
 import type { RankedBeat } from '../types/beat';
 
@@ -7,6 +7,42 @@ export function RankingsView() {
   const [beats, setBeats] = useState<RankedBeat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [downloadStatus, setDownloadStatus] = useState<{ msg: string; type: 'loading' | 'error' } | null>(null);
+
+  const handleDownload = async (videoId: string, title: string) => {
+    setDownloadStatus({ msg: 'Preparando descarga...', type: 'loading' });
+    try {
+      const res = await fetch('https://api.cobalt.tools/api/json', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          isAudioOnly: true,
+          aFormat: 'mp3',
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'stream' || data.status === 'redirect') {
+        const link = document.createElement('a');
+        link.href = data.url;
+        link.download = `${title}.mp3`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setDownloadStatus(null);
+      } else {
+        setDownloadStatus({ msg: data.text || 'Error al descargar', type: 'error' });
+        setTimeout(() => setDownloadStatus(null), 3000);
+      }
+    } catch {
+      setDownloadStatus({ msg: 'Error de conexion', type: 'error' });
+      setTimeout(() => setDownloadStatus(null), 3000);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -162,21 +198,45 @@ export function RankingsView() {
                   </div>
                 </div>
 
-                {/* YouTube link */}
-                <a
-                  href={`https://www.youtube.com/watch?v=${beat.videoId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity
-                             text-blood hover:text-white p-1"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+                {/* Actions */}
+                <div className="flex-shrink-0 flex flex-col gap-1">
+                  <a
+                    href={`https://www.youtube.com/watch?v=${beat.videoId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blood hover:text-white p-1 transition-colors"
+                    title="Ver en YouTube"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <button
+                    onClick={() => handleDownload(beat.videoId, beat.title)}
+                    className="text-neon hover:text-white p-1 transition-colors"
+                    title="Descargar MP3"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Download status toast */}
+      {downloadStatus && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className={`px-6 py-3 font-bold uppercase tracking-wider text-sm
+                          flex items-center gap-2 border-2 ${
+                            downloadStatus.type === 'loading'
+                              ? 'bg-neon/90 text-black border-neon glow-neon'
+                              : 'bg-blood/90 text-white border-blood glow-red'
+                          }`}>
+            {downloadStatus.type === 'loading' && <Flame className="w-4 h-4 animate-pulse" />}
+            {downloadStatus.msg}
+          </div>
+        </div>
+      )}
 
       {/* Bottom spacer */}
       <div className="h-8" />

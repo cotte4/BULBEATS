@@ -26,6 +26,7 @@ export function SwipeView() {
   const { usernameSlug, username } = useUserStore();
   const [selectedChannel, setSelectedChannel] = useState<string>('All Channels');
   const [showSaveToast, setShowSaveToast] = useState(false);
+  const [showSkipToast, setShowSkipToast] = useState(false);
 
   // Get unique channels from loaded beats
   const channels = useMemo(() => {
@@ -43,6 +44,8 @@ export function SwipeView() {
   const handleSkip = useCallback(() => {
     if (currentBeat && usernameSlug && username) {
       castVote(currentBeat, 'dislike', usernameSlug, username).catch(() => {});
+      setShowSkipToast(true);
+      setTimeout(() => setShowSkipToast(false), 800);
     }
     if (hasMore) {
       nextBeat();
@@ -280,8 +283,20 @@ export function SwipeView() {
           <div className="px-6 py-3 bg-neon/90 text-black font-bold uppercase tracking-wider text-sm
                           flex items-center gap-2 border-2 border-neon glow-neon">
             <Flame className="w-4 h-4" />
-            Guardado!
+            {username} guardó esto!
             <Flame className="w-4 h-4" />
+          </div>
+        </div>
+      )}
+
+      {/* Skip toast notification */}
+      {showSkipToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 save-toast">
+          <div className="px-6 py-3 bg-blood/90 text-white font-bold uppercase tracking-wider text-sm
+                          flex items-center gap-2 border-2 border-blood glow-red">
+            <Skull className="w-4 h-4" />
+            {username} pasó
+            <Skull className="w-4 h-4" />
           </div>
         </div>
       )}
