@@ -45,10 +45,11 @@ export function DownloadModal({ videoId, title, onClose }: DownloadModalProps) {
         {/* Download iframe */}
         <div className="px-4 pb-2 flex justify-center">
           <iframe
-            src={`https://yt-mp3s.me/iframe?videoId=${videoId}&bg=39ff14`}
+            src={`https://yt-mp3s.me/button/mp3/${videoId}?bg=39ff14`}
             width="100%"
-            height="60"
-            style={{ border: 'none', maxWidth: '300px' }}
+            height="57"
+            scrolling="no"
+            style={{ border: 'none', overflow: 'hidden', minWidth: '200px', maxWidth: '350px' }}
             title="Download MP3"
           />
         </div>
