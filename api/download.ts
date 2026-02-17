@@ -1,34 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-const COBALT_INSTANCES = [
-  'https://cobalt-backend.canine.tools',
-  'https://cobalt-api.meowing.de',
-  'https://capi.3kh0.net',
-];
-
-async function tryInstance(instanceUrl: string, videoId: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-
-  try {
-    return await fetch(`${instanceUrl}/`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'BulBeats/1.0',
-      },
-      body: JSON.stringify({
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        downloadMode: 'audio',
-        audioFormat: 'mp3',
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
+import ytdl from '@distube/ytdl-core';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -49,31 +20,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'videoId is required' });
   }
 
-  const errors: string[] = [];
+  try {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const info = await ytdl.getInfo(url);
 
-  for (const instance of COBALT_INSTANCES) {
-    try {
-      const response = await tryInstance(instance, videoId);
-      const data = await response.json();
+    // Get the best audio-only format
+    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
 
-      if (data.status === 'tunnel' || data.status === 'redirect') {
-        return res.status(200).json({
-          status: data.status,
-          url: data.url,
-          filename: data.filename,
-        });
-      }
-
-      errors.push(`${instance}: ${data.status} - ${JSON.stringify(data.error || data.text || 'unknown')}`);
-    } catch (e) {
-      errors.push(`${instance}: ${e instanceof Error ? e.message : 'failed'}`);
-      continue;
+    if (audioFormats.length === 0) {
+      return res.status(404).json({ error: 'No audio formats found' });
     }
-  }
 
-  return res.status(502).json({
-    status: 'error',
-    error: 'No se pudo obtener el audio.',
-    debug: errors,
-  });
+    // Sort by bitrate (highest first)
+    audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
+    const best = audioFormats[0];
+
+    return res.status(200).json({
+      status: 'redirect',
+      url: best.url,
+      filename: `${info.videoDetails.title}.${best.container || 'webm'}`,
+      format: best.container,
+      bitrate: best.audioBitrate,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(502).json({
+      status: 'error',
+      error: 'No se pudo obtener el audio.',
+      debug: message,
+    });
+  }
 }
