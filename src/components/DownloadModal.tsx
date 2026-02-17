@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Download, Copy, Check, ExternalLink, Skull, HardDrive, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Download, Copy, Check, ExternalLink, Skull, HardDrive, Loader2, CheckCircle2, AlertCircle, Terminal } from 'lucide-react';
 
 interface DownloadModalProps {
   videoId: string;
@@ -119,6 +119,29 @@ export function DownloadModal({ videoId, title, onClose }: DownloadModalProps) {
         <div className="px-4 pt-3 pb-1">
           <p className="text-gray-400 text-xs truncate">{title}</p>
         </div>
+
+        {/* Tip: local server offline */}
+        {localStatus === 'offline' && (
+          <div className="mx-4 mt-3 px-3 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-sm">
+            <div className="flex items-start gap-2">
+              <Terminal className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-amber-300 text-[11px] font-semibold leading-tight">
+                  Descarga directa disponible
+                </p>
+                <p className="text-amber-400/60 text-[10px] mt-0.5 leading-snug">
+                  Ejecuta en tu terminal:
+                </p>
+                <code className="text-amber-300/80 text-[10px] bg-black/30 px-1.5 py-0.5 mt-1 inline-block font-mono">
+                  npm run download-server
+                </code>
+                <p className="text-amber-400/50 text-[9px] mt-1 leading-snug">
+                  El MP3 se descarga directo a tu PC sin sitios externos
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Local server download (shown first when available) */}
         {localStatus === 'online' && (
