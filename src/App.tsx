@@ -55,7 +55,12 @@ function App() {
       )}
 
       {view === 'genres' && (
-        <GenreSelect onSelectGenre={handleSelectGenre} />
+        <GenreSelect
+          onSelectGenre={handleSelectGenre}
+          onRankings={handleRankings}
+          onFavorites={handleFavorites}
+          favoritesCount={favorites.length}
+        />
       )}
 
       {view === 'swipe' && <SwipeView />}

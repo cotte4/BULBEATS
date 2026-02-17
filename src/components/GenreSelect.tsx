@@ -1,12 +1,15 @@
-import { Flame, Skull, Zap, Search } from 'lucide-react';
+import { Flame, Skull, Zap, Search, Trophy, Heart } from 'lucide-react';
 import { GENRES } from '../types/genres';
 import { useState } from 'react';
 
 interface GenreSelectProps {
   onSelectGenre: (searchTerm: string) => void;
+  onRankings: () => void;
+  onFavorites: () => void;
+  favoritesCount: number;
 }
 
-export function GenreSelect({ onSelectGenre }: GenreSelectProps) {
+export function GenreSelect({ onSelectGenre, onRankings, onFavorites, favoritesCount }: GenreSelectProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSearch = () => {
@@ -95,6 +98,35 @@ export function GenreSelect({ onSelectGenre }: GenreSelectProps) {
            style={{ transform: 'skewX(0deg)' }}>
           Ej: "Metro Boomin type beat", "dark trap 140 bpm"
         </p>
+      </div>
+
+      {/* Rankings & Favorites */}
+      <div className="flex gap-3 w-full max-w-md mb-6 relative z-10">
+        <button
+          onClick={onRankings}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4
+                     bg-gradient-to-r from-gold/10 to-blood/10
+                     border-2 border-gold/40 hover:border-gold
+                     text-white font-bold uppercase tracking-wider text-sm
+                     transition-all hover:glow-red active:scale-95"
+        >
+          <Trophy className="w-5 h-5 text-gold" />
+          Rankings
+        </button>
+        <button
+          onClick={onFavorites}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4
+                     bg-gradient-to-r from-blood/10 to-hot-pink/10
+                     border-2 border-blood/40 hover:border-blood
+                     text-white font-bold uppercase tracking-wider text-sm
+                     transition-all hover:glow-red active:scale-95"
+        >
+          <Heart className="w-5 h-5 text-blood fill-blood" />
+          Favoritos
+          {favoritesCount > 0 && (
+            <span className="text-neon text-xs">({favoritesCount})</span>
+          )}
+        </button>
       </div>
 
       {/* Genre Grid */}
