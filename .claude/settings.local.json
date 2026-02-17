@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(npx vite build)",
+      "Bash(npx vite:*)",
+      "WebFetch(domain:beatfinder-psi.vercel.app)"
+    ]
+  }
+}

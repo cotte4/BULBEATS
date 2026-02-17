@@ -1,7 +1,8 @@
-import { Heart, Play, Square, Trash2, Skull, Flame, ExternalLink, Grid, List, User, Download } from 'lucide-react';
+import { Heart, Play, Square, Trash2, Skull, ExternalLink, Grid, List, User, Download } from 'lucide-react';
 import { useFavoritesStore } from '../stores/useFavoritesStore';
 import { useState, useMemo } from 'react';
 import { useDownload } from '../hooks/useDownload';
+import { DownloadModal } from './DownloadModal';
 
 type SortBy = 'recent' | 'bpm' | 'channel';
 
@@ -27,7 +28,7 @@ export function FavoritesList() {
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [filterChannel, setFilterChannel] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const { downloadStatus, handleDownload } = useDownload();
+  const { downloadModal, handleDownload, closeDownload } = useDownload();
 
   const channels = useMemo(() => {
     const set = new Set(favorites.map(b => b.channelTitle));
@@ -390,19 +391,13 @@ export function FavoritesList() {
         <Skull className="w-4 h-4 text-blood/50" />
       </div>
 
-      {/* Download status toast */}
-      {downloadStatus && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className={`px-6 py-3 font-bold uppercase tracking-wider text-sm
-                          flex items-center gap-2 border-2 ${
-                            downloadStatus.type === 'error'
-                              ? 'bg-blood/90 text-white border-blood glow-red'
-                              : 'bg-neon/90 text-black border-neon glow-neon'
-                          }`}>
-            {downloadStatus.type === 'loading' && <Flame className="w-4 h-4 animate-pulse" />}
-            {downloadStatus.msg}
-          </div>
-        </div>
+      {/* Download modal */}
+      {downloadModal && (
+        <DownloadModal
+          videoId={downloadModal.videoId}
+          title={downloadModal.title}
+          onClose={closeDownload}
+        />
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Flame, ThumbsUp, ThumbsDown, Skull, ExternalLink, Download, User } from 'lucide-react';
 import { getRankedBeats, getVotersForBeat } from '../lib/firestore';
 import { useDownload } from '../hooks/useDownload';
+import { DownloadModal } from './DownloadModal';
 import type { RankedBeat } from '../types/beat';
 import type { BeatVoter } from '../lib/firestore';
 
@@ -10,7 +11,7 @@ export function RankingsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [voters, setVoters] = useState<Record<string, BeatVoter[]>>({});
-  const { downloadStatus, handleDownload } = useDownload();
+  const { downloadModal, handleDownload, closeDownload } = useDownload();
 
   useEffect(() => {
     let cancelled = false;
@@ -221,19 +222,13 @@ export function RankingsView() {
         })}
       </div>
 
-      {/* Download status toast */}
-      {downloadStatus && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className={`px-6 py-3 font-bold uppercase tracking-wider text-sm
-                          flex items-center gap-2 border-2 ${
-                            downloadStatus.type === 'error'
-                              ? 'bg-blood/90 text-white border-blood glow-red'
-                              : 'bg-neon/90 text-black border-neon glow-neon'
-                          }`}>
-            {downloadStatus.type === 'loading' && <Flame className="w-4 h-4 animate-pulse" />}
-            {downloadStatus.msg}
-          </div>
-        </div>
+      {/* Download modal */}
+      {downloadModal && (
+        <DownloadModal
+          videoId={downloadModal.videoId}
+          title={downloadModal.title}
+          onClose={closeDownload}
+        />
       )}
 
       <div className="h-8" />
