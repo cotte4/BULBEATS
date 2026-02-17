@@ -1,27 +1,43 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const COBALT_INSTANCES = [
-  'https://api.cobalt.tools',
-  'https://cobalt-api.kwiatekmiki.com',
-  'https://cobalt.api.timelessnesses.me',
+  'https://cobalt-backend.canine.tools',
+  'https://cobalt-api.meowing.de',
+  'https://capi.3kh0.net',
 ];
 
-async function tryInstance(url: string, videoId: string): Promise<Response> {
-  return fetch(`${url}/`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      downloadMode: 'audio',
-      audioFormat: 'mp3',
-    }),
-  });
+async function tryInstance(instanceUrl: string, videoId: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    return await fetch(`${instanceUrl}/`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        downloadMode: 'audio',
+        audioFormat: 'mp3',
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -44,16 +60,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           filename: data.filename,
         });
       }
-
-      if (data.status === 'error') {
-        continue;
-      }
     } catch {
       continue;
     }
   }
 
   return res.status(502).json({
-    error: 'No se pudo obtener el audio. Intenta de nuevo mas tarde.',
+    status: 'fallback',
+    error: 'No se pudo obtener el audio desde el servidor.',
   });
 }

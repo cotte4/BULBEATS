@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 interface DownloadStatus {
   msg: string;
-  type: 'loading' | 'error';
+  type: 'loading' | 'success' | 'error';
 }
 
 export function useDownload() {
@@ -14,9 +14,7 @@ export function useDownload() {
     try {
       const res = await fetch('/api/download', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoId }),
       });
 
@@ -27,18 +25,23 @@ export function useDownload() {
         link.href = data.url;
         link.download = `${title}.mp3`;
         link.target = '_blank';
+        link.rel = 'noopener noreferrer';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        setDownloadStatus(null);
-      } else {
-        setDownloadStatus({ msg: data.error || 'Error al descargar', type: 'error' });
-        setTimeout(() => setDownloadStatus(null), 3000);
+        setDownloadStatus({ msg: 'Descarga iniciada!', type: 'success' });
+        setTimeout(() => setDownloadStatus(null), 2000);
+        return;
       }
     } catch {
-      setDownloadStatus({ msg: 'Error de conexion', type: 'error' });
-      setTimeout(() => setDownloadStatus(null), 3000);
+      // API failed, fall through to fallback
     }
+
+    // Fallback: open cobalt.tools in a new tab
+    const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    window.open(`https://cobalt.tools/#url=${encodeURIComponent(ytUrl)}`, '_blank');
+    setDownloadStatus({ msg: 'Abriendo cobalt.tools...', type: 'loading' });
+    setTimeout(() => setDownloadStatus(null), 2500);
   };
 
   return { downloadStatus, handleDownload };

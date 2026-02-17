@@ -3,6 +3,12 @@ import type { Beat, YouTubeSearchResponse, SearchResult, BpmRange } from '../typ
 const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const BASE_URL = 'https://www.googleapis.com/youtube/v3/search';
 
+// Decode HTML entities returned by YouTube API (e.g. &amp; &quot; &#39;)
+function decodeHtmlEntities(text: string): string {
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  return doc.documentElement.textContent || text;
+}
+
 // Fisher-Yates shuffle for randomizing beats
 function shuffle<T>(array: T[]): T[] {
   const shuffled = [...array];
@@ -81,14 +87,17 @@ export async function searchBeats(query: string, pageToken?: string): Promise<Se
 
   const data: YouTubeSearchResponse = await response.json();
 
-  const beats: Beat[] = data.items.map((item) => ({
-    videoId: item.id.videoId,
-    title: item.snippet.title,
-    thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium.url,
-    channelTitle: item.snippet.channelTitle,
-    bpm: parseBpm(item.snippet.title),
-    typeBeat: parseTypeBeat(item.snippet.title),
-  }));
+  const beats: Beat[] = data.items.map((item) => {
+    const title = decodeHtmlEntities(item.snippet.title);
+    return {
+      videoId: item.id.videoId,
+      title,
+      thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium.url,
+      channelTitle: decodeHtmlEntities(item.snippet.channelTitle),
+      bpm: parseBpm(title),
+      typeBeat: parseTypeBeat(title),
+    };
+  });
 
   return {
     beats: shuffle(beats),

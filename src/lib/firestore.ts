@@ -9,6 +9,7 @@ import {
   limit,
   getDocs,
   serverTimestamp,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Beat } from '../types/beat';
@@ -123,5 +124,23 @@ export async function getRankedBeats(count = 50): Promise<RankedBeat[]> {
       dislikes: data.dislikes ?? 0,
       netVotes: data.netVotes ?? 0,
     } as RankedBeat;
+  });
+}
+
+export interface BeatVoter {
+  username: string;
+  vote: 'like' | 'dislike';
+}
+
+export async function getVotersForBeat(videoId: string): Promise<BeatVoter[]> {
+  const votesRef = collection(db, 'beats', videoId, 'votes');
+  const q = query(votesRef, where('vote', '==', 'like'), limit(10));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      username: data.username,
+      vote: data.vote,
+    };
   });
 }

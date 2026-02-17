@@ -402,9 +402,9 @@ export function FavoritesList() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
           <div className={`px-6 py-3 font-bold uppercase tracking-wider text-sm
                           flex items-center gap-2 border-2 ${
-                            downloadStatus.type === 'loading'
-                              ? 'bg-neon/90 text-black border-neon glow-neon'
-                              : 'bg-blood/90 text-white border-blood glow-red'
+                            downloadStatus.type === 'error'
+                              ? 'bg-blood/90 text-white border-blood glow-red'
+                              : 'bg-neon/90 text-black border-neon glow-neon'
                           }`}>
             {downloadStatus.type === 'loading' && <Flame className="w-4 h-4 animate-pulse" />}
             {downloadStatus.msg}

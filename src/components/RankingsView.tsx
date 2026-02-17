@@ -1,21 +1,36 @@
 import { useEffect, useState } from 'react';
-import { Flame, ThumbsUp, ThumbsDown, Skull, ExternalLink, Download } from 'lucide-react';
-import { getRankedBeats } from '../lib/firestore';
+import { Flame, ThumbsUp, ThumbsDown, Skull, ExternalLink, Download, User } from 'lucide-react';
+import { getRankedBeats, getVotersForBeat } from '../lib/firestore';
 import { useDownload } from '../hooks/useDownload';
 import type { RankedBeat } from '../types/beat';
+import type { BeatVoter } from '../lib/firestore';
 
 export function RankingsView() {
   const [beats, setBeats] = useState<RankedBeat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [voters, setVoters] = useState<Record<string, BeatVoter[]>>({});
   const { downloadStatus, handleDownload } = useDownload();
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     getRankedBeats(50)
-      .then((data) => {
-        if (!cancelled) setBeats(data);
+      .then(async (data) => {
+        if (cancelled) return;
+        setBeats(data);
+
+        const voterMap: Record<string, BeatVoter[]> = {};
+        const promises = data.slice(0, 20).map(async (beat) => {
+          try {
+            const v = await getVotersForBeat(beat.videoId);
+            voterMap[beat.videoId] = v;
+          } catch {
+            voterMap[beat.videoId] = [];
+          }
+        });
+        await Promise.all(promises);
+        if (!cancelled) setVoters(voterMap);
       })
       .catch(() => {
         if (!cancelled) setError('Error cargando rankings');
@@ -85,6 +100,7 @@ export function RankingsView() {
         {beats.map((beat, i) => {
           const totalVotes = beat.likes + beat.dislikes;
           const likePercent = totalVotes > 0 ? (beat.likes / totalVotes) * 100 : 50;
+          const beatVoters = voters[beat.videoId] || [];
 
           return (
             <div
@@ -148,6 +164,23 @@ export function RankingsView() {
                     </div>
                     <ThumbsDown className="w-3 h-3 text-blood flex-shrink-0" />
                   </div>
+
+                  {/* Voters who liked */}
+                  {beatVoters.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <User className="w-3 h-3 text-neon/60 flex-shrink-0" />
+                      {beatVoters.map((v, idx) => (
+                        <span key={idx} className="text-[10px] text-neon/70 uppercase tracking-wider">
+                          {v.username}{idx < beatVoters.length - 1 ? ',' : ''}
+                        </span>
+                      ))}
+                      {beat.likes > beatVoters.length && (
+                        <span className="text-[10px] text-gray-500">
+                          +{beat.likes - beatVoters.length} mas
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Vote count */}
@@ -194,9 +227,9 @@ export function RankingsView() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
           <div className={`px-6 py-3 font-bold uppercase tracking-wider text-sm
                           flex items-center gap-2 border-2 ${
-                            downloadStatus.type === 'loading'
-                              ? 'bg-neon/90 text-black border-neon glow-neon'
-                              : 'bg-blood/90 text-white border-blood glow-red'
+                            downloadStatus.type === 'error'
+                              ? 'bg-blood/90 text-white border-blood glow-red'
+                              : 'bg-neon/90 text-black border-neon glow-neon'
                           }`}>
             {downloadStatus.type === 'loading' && <Flame className="w-4 h-4 animate-pulse" />}
             {downloadStatus.msg}
