@@ -1,9 +1,52 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import ytdl from '@distube/ytdl-core';
 
 export const config = {
-  maxDuration: 30,
+  maxDuration: 15,
 };
+
+interface PipedStream {
+  url: string;
+  format: string;
+  quality: string;
+  mimeType: string;
+  bitrate: number;
+  contentLength: number;
+}
+
+interface PipedResponse {
+  title: string;
+  audioStreams: PipedStream[];
+}
+
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://pipedapi.r4fo.com',
+  'https://pipedapi.in.projectsegfau.lt',
+];
+
+async function tryPiped(instance: string, videoId: string): Promise<PipedResponse | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const res = await fetch(`${instance}/streams/${videoId}`, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'BulBeats/1.0' },
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.audioStreams && data.audioStreams.length > 0) {
+      return data as PipedResponse;
+    }
+    return null;
+  } catch {
+    clearTimeout(timeout);
+    return null;
+  }
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,45 +67,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'videoId is required' });
   }
 
-  try {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const errors: string[] = [];
 
-    const info = await ytdl.getInfo(url, {
-      requestOptions: {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        },
-      },
-    });
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const data = await tryPiped(instance, videoId);
 
-    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+      if (data && data.audioStreams.length > 0) {
+        // Sort by bitrate, pick highest quality
+        const sorted = [...data.audioStreams].sort((a, b) => b.bitrate - a.bitrate);
+        const best = sorted[0];
+        const title = data.title.replace(/[<>:"/\\|?*]/g, '');
 
-    if (audioFormats.length === 0) {
-      return res.status(404).json({
-        status: 'error',
-        error: 'No se encontraron formatos de audio.',
-      });
+        return res.status(200).json({
+          status: 'ok',
+          url: best.url,
+          filename: `${title}.mp3`,
+          bitrate: Math.round(best.bitrate / 1000),
+        });
+      }
+
+      errors.push(`${instance}: no audio streams`);
+    } catch (e) {
+      errors.push(`${instance}: ${e instanceof Error ? e.message : 'failed'}`);
     }
-
-    audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
-    const best = audioFormats[0];
-
-    const title = info.videoDetails.title.replace(/[<>:"/\\|?*]/g, '');
-
-    return res.status(200).json({
-      status: 'ok',
-      url: best.url,
-      filename: `${title}.${best.container || 'webm'}`,
-      format: best.container,
-      bitrate: best.audioBitrate,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Download error:', message);
-    return res.status(502).json({
-      status: 'error',
-      error: 'No se pudo obtener el audio. YouTube puede estar bloqueando.',
-      debug: message,
-    });
   }
+
+  return res.status(502).json({
+    status: 'error',
+    error: 'No se pudo obtener el audio. Intenta de nuevo.',
+    debug: errors,
+  });
 }
