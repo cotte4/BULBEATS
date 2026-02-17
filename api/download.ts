@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import ytdl from '@distube/ytdl-core';
 
+export const config = {
+  maxDuration: 30,
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -22,31 +26,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const info = await ytdl.getInfo(url);
 
-    // Get the best audio-only format
+    const info = await ytdl.getInfo(url, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        },
+      },
+    });
+
     const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
 
     if (audioFormats.length === 0) {
-      return res.status(404).json({ error: 'No audio formats found' });
+      return res.status(404).json({
+        status: 'error',
+        error: 'No se encontraron formatos de audio.',
+      });
     }
 
-    // Sort by bitrate (highest first)
     audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
     const best = audioFormats[0];
 
+    const title = info.videoDetails.title.replace(/[<>:"/\\|?*]/g, '');
+
     return res.status(200).json({
-      status: 'redirect',
+      status: 'ok',
       url: best.url,
-      filename: `${info.videoDetails.title}.${best.container || 'webm'}`,
+      filename: `${title}.${best.container || 'webm'}`,
       format: best.container,
       bitrate: best.audioBitrate,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Download error:', message);
     return res.status(502).json({
       status: 'error',
-      error: 'No se pudo obtener el audio.',
+      error: 'No se pudo obtener el audio. YouTube puede estar bloqueando.',
       debug: message,
     });
   }

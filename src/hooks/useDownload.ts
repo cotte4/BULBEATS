@@ -12,23 +12,22 @@ export function useDownload() {
     setDownloadStatus({ msg: 'Obteniendo audio...', type: 'loading' });
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25000);
+
       const res = await fetch('/api/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoId }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeout);
       const data = await res.json();
 
       if (data.url) {
-        const link = document.createElement('a');
-        link.href = data.url;
-        link.download = `${title}.mp3`;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Open in new tab - browsers handle the audio stream download
+        window.open(data.url, '_blank');
         setDownloadStatus({ msg: 'Descarga iniciada!', type: 'success' });
         setTimeout(() => setDownloadStatus(null), 2500);
         return;
@@ -38,10 +37,14 @@ export function useDownload() {
         msg: data.error || 'Error al obtener audio',
         type: 'error',
       });
-      setTimeout(() => setDownloadStatus(null), 3500);
-    } catch {
-      setDownloadStatus({ msg: 'Error de conexion', type: 'error' });
-      setTimeout(() => setDownloadStatus(null), 3500);
+      setTimeout(() => setDownloadStatus(null), 4000);
+    } catch (err) {
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      setDownloadStatus({
+        msg: isAbort ? 'Tiempo agotado. Intenta de nuevo.' : 'Error de conexion',
+        type: 'error',
+      });
+      setTimeout(() => setDownloadStatus(null), 4000);
     }
   };
 
