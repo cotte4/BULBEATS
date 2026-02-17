@@ -1,48 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Flame, ThumbsUp, ThumbsDown, Skull, ExternalLink, Download } from 'lucide-react';
 import { getRankedBeats } from '../lib/firestore';
+import { useDownload } from '../hooks/useDownload';
 import type { RankedBeat } from '../types/beat';
 
 export function RankingsView() {
   const [beats, setBeats] = useState<RankedBeat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [downloadStatus, setDownloadStatus] = useState<{ msg: string; type: 'loading' | 'error' } | null>(null);
-
-  const handleDownload = async (videoId: string, title: string) => {
-    setDownloadStatus({ msg: 'Preparando descarga...', type: 'loading' });
-    try {
-      const res = await fetch('https://api.cobalt.tools/api/json', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: `https://www.youtube.com/watch?v=${videoId}`,
-          isAudioOnly: true,
-          aFormat: 'mp3',
-        }),
-      });
-      const data = await res.json();
-      if (data.status === 'stream' || data.status === 'redirect') {
-        const link = document.createElement('a');
-        link.href = data.url;
-        link.download = `${title}.mp3`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setDownloadStatus(null);
-      } else {
-        setDownloadStatus({ msg: data.text || 'Error al descargar', type: 'error' });
-        setTimeout(() => setDownloadStatus(null), 3000);
-      }
-    } catch {
-      setDownloadStatus({ msg: 'Error de conexion', type: 'error' });
-      setTimeout(() => setDownloadStatus(null), 3000);
-    }
-  };
+  const { downloadStatus, handleDownload } = useDownload();
 
   useEffect(() => {
     let cancelled = false;
