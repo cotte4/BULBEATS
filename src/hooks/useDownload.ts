@@ -8,7 +8,7 @@ interface DownloadStatus {
 export function useDownload() {
   const [downloadStatus, setDownloadStatus] = useState<DownloadStatus | null>(null);
 
-  const handleDownload = async (videoId: string, title: string) => {
+  const handleDownload = async (videoId: string, _title: string) => {
     setDownloadStatus({ msg: 'Obteniendo audio...', type: 'loading' });
 
     try {
