@@ -64,14 +64,16 @@ function parseTypeBeat(title: string): string | undefined {
 export async function searchBeats(query: string, pageToken?: string): Promise<SearchResult> {
   if (!query.trim()) return { beats: [] };
 
-  const searchQuery = `${query} beat instrumental`;
+  const lowerQuery = query.toLowerCase();
+  const hasBeatKeyword = lowerQuery.includes('beat') || lowerQuery.includes('instrumental');
+  const searchQuery = hasBeatKeyword ? query : `${query} type beat instrumental`;
 
   const params = new URLSearchParams({
     part: 'snippet',
     q: searchQuery,
     type: 'video',
     videoCategoryId: '10',
-    maxResults: '50',
+    maxResults: '25',
     key: API_KEY,
   });
 
@@ -100,7 +102,7 @@ export async function searchBeats(query: string, pageToken?: string): Promise<Se
   });
 
   return {
-    beats: shuffle(beats),
+    beats,
     nextPageToken: data.nextPageToken,
   };
 }
