@@ -29,22 +29,16 @@ export function FavoritesList() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const { downloadStatus, handleDownload } = useDownload();
 
-  // Unique channels from favorites
   const channels = useMemo(() => {
     const set = new Set(favorites.map(b => b.channelTitle));
     return Array.from(set).sort();
   }, [favorites]);
 
-  // Sorted & filtered list
   const displayBeats = useMemo(() => {
     let list = [...favorites];
-
-    // Filter
     if (filterChannel !== 'all') {
       list = list.filter(b => b.channelTitle === filterChannel);
     }
-
-    // Sort
     switch (sortBy) {
       case 'bpm':
         list.sort((a, b) => (b.bpm || 0) - (a.bpm || 0));
@@ -54,28 +48,23 @@ export function FavoritesList() {
         break;
       case 'recent':
       default:
-        // Already in recent-first order from store
         break;
     }
-
     return list;
   }, [favorites, sortBy, filterChannel]);
 
   if (favorites.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6 relative">
-        {/* Background effect */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-blood/10 rounded-full blur-3xl" />
           <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-hot-pink/10 rounded-full blur-3xl" />
         </div>
-
         <div className="relative z-10">
           <div className="relative mb-6">
             <Heart className="w-20 h-20 text-blood/30" />
             <Skull className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-blood" />
           </div>
-
           <p className="text-gray-400 text-xl mb-3 uppercase tracking-widest">
             Aun no tienes favoritos
           </p>
@@ -84,12 +73,6 @@ export function FavoritesList() {
             Swipea a la derecha para guardar beats
             <span className="text-neon">&rarr;</span>
           </p>
-
-          <div className="mt-8 flex gap-2 justify-center">
-            <span className="text-2xl">💀</span>
-            <span className="text-2xl fire-emoji">🔥</span>
-            <span className="text-2xl">💀</span>
-          </div>
         </div>
       </div>
     );
@@ -97,7 +80,6 @@ export function FavoritesList() {
 
   return (
     <div className="flex-1 overflow-auto px-4 py-4 relative">
-      {/* Background effect */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blood/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-hot-pink/5 rounded-full blur-3xl" />
@@ -118,7 +100,6 @@ export function FavoritesList() {
 
       {/* Sort / Filter / View Toolbar */}
       <div className="flex flex-wrap items-center justify-center gap-3 mb-6 relative z-10">
-        {/* Sort */}
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortBy)}
@@ -133,7 +114,6 @@ export function FavoritesList() {
           <option value="channel" className="bg-surface">Canal A→Z</option>
         </select>
 
-        {/* Channel Filter */}
         {channels.length > 1 && (
           <div className="flex items-center gap-1.5">
             <User className="w-3.5 h-3.5 text-neon" />
@@ -159,7 +139,6 @@ export function FavoritesList() {
           </div>
         )}
 
-        {/* View Toggle */}
         <div className="flex border-2 border-blood/40">
           <button
             onClick={() => setViewMode('list')}
@@ -178,16 +157,15 @@ export function FavoritesList() {
 
       {/* Grid View */}
       {viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-2xl mx-auto relative z-10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 max-w-5xl mx-auto relative z-10">
           {displayBeats.map((beat) => (
             <div
               key={beat.videoId}
               className="group relative bg-surface border-2 border-blood/30 overflow-hidden
-                         hover:border-blood transition-all duration-300 cursor-pointer"
-              onClick={() => setPlayingId(playingId === beat.videoId ? null : beat.videoId)}
+                         hover:border-blood transition-all duration-300"
             >
               {playingId === beat.videoId ? (
-                <div className="aspect-video bg-black">
+                <div className="aspect-video bg-black relative">
                   <iframe
                     src={`https://www.youtube.com/embed/${beat.videoId}?autoplay=1&rel=0`}
                     title={beat.title}
@@ -195,9 +173,18 @@ export function FavoritesList() {
                     allowFullScreen
                     className="w-full h-full"
                   />
+                  <button
+                    onClick={() => setPlayingId(null)}
+                    className="absolute top-1 right-1 p-1 bg-blood/90 text-white border border-blood"
+                  >
+                    <Square className="w-3 h-3 fill-white" />
+                  </button>
                 </div>
               ) : (
-                <div className="relative aspect-video">
+                <div
+                  className="relative aspect-video cursor-pointer"
+                  onClick={() => setPlayingId(beat.videoId)}
+                >
                   <img src={beat.thumbnail} alt={beat.title} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center
                                   opacity-0 group-hover:opacity-100 transition-opacity">
@@ -216,22 +203,46 @@ export function FavoritesList() {
                 </h3>
                 <p className="text-gray-500 text-[10px] truncate">{beat.channelTitle}</p>
               </div>
+              {/* Grid action bar */}
+              <div className="flex border-t border-blood/20">
+                <button
+                  onClick={() => handleDownload(beat.videoId, beat.title)}
+                  className="flex-1 flex items-center justify-center gap-1 py-2
+                             text-neon hover:bg-neon/10 transition-all text-[10px] uppercase tracking-wider font-bold"
+                >
+                  <Download className="w-3 h-3" />
+                  MP3
+                </button>
+                <a
+                  href={`https://www.youtube.com/watch?v=${beat.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1 py-2
+                             text-gray-400 hover:bg-white/5 transition-all text-[10px] uppercase tracking-wider font-bold
+                             border-x border-blood/20"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  YT
+                </a>
+                <button
+                  onClick={() => removeFavorite(beat.videoId)}
+                  className="flex-1 flex items-center justify-center gap-1 py-2
+                             text-blood hover:bg-blood/10 transition-all text-[10px] uppercase tracking-wider font-bold"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       ) : (
         /* List View */
-        <div className="space-y-4 max-w-2xl mx-auto relative z-10">
+        <div className="space-y-4 max-w-3xl mx-auto relative z-10">
           {displayBeats.map((beat, index) => (
             <div
               key={beat.videoId}
               className="group relative bg-surface border-2 border-blood/30 overflow-hidden
                          hover:border-blood transition-all duration-300 hover:glow-red"
-              style={{
-                clipPath: index % 2 === 0
-                  ? 'polygon(0 0, 100% 0, 100% 100%, 2% 100%)'
-                  : 'polygon(0 0, 98% 0, 100% 100%, 0 100%)'
-              }}
             >
               {/* Corner accent */}
               <div className="absolute top-0 left-0 w-8 h-8 bg-blood/20 flex items-center justify-center z-10">
@@ -247,7 +258,6 @@ export function FavoritesList() {
                     allowFullScreen
                     className="w-full h-full"
                   />
-                  {/* Stop button */}
                   <button
                     onClick={() => setPlayingId(null)}
                     className="absolute top-2 right-2 px-3 py-1 bg-blood/90 text-white text-xs font-bold
@@ -268,37 +278,24 @@ export function FavoritesList() {
                     alt={beat.title}
                     className="w-full h-full object-cover"
                   />
-                  {/* Hover overlay */}
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center
                                   opacity-0 group-hover/thumb:opacity-100 transition-opacity">
                     <div className="relative">
-                      {/* Outer ring */}
                       <div className="w-20 h-20 border-4 border-neon/50 flex items-center justify-center
                                     group-hover/thumb:border-neon transition-colors"
                            style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}>
                         <Play className="w-10 h-10 text-neon fill-neon ml-1" />
                       </div>
-                      {/* Glow effect */}
                       <div className="absolute inset-0 blur-xl bg-neon/30 -z-10" />
                     </div>
                   </div>
-
-                  {/* Gradient overlay at bottom */}
                   <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-surface to-transparent" />
                 </div>
               )}
 
               {/* Beat info */}
-              <div className="p-4 flex items-start justify-between gap-3 relative">
-                {/* Background pattern */}
-                <div className="absolute inset-0 opacity-5">
-                  <div className="absolute inset-0" style={{
-                    backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 5px, rgba(255,0,51,0.1) 5px, rgba(255,0,51,0.1) 10px)'
-                  }} />
-                </div>
-
-                <div className="flex-1 min-w-0 relative z-10">
-                  {/* Metadata badges */}
+              <div className="p-4 relative">
+                <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap gap-2 mb-2">
                     {beat.bpm && (
                       <span className="px-2 py-0.5 bg-blood/20 text-blood text-xs font-bold
@@ -328,45 +325,41 @@ export function FavoritesList() {
                     {beat.channelTitle}
                   </p>
                 </div>
+              </div>
 
-                {/* Action buttons */}
-                <div className="flex flex-col gap-2 shrink-0">
-                  {/* YouTube link */}
-                  <a
-                    href={`https://www.youtube.com/watch?v=${beat.videoId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-2.5 bg-neon/10 border border-neon/30
-                               hover:bg-neon/20 hover:border-neon
-                               transition-all flex items-center justify-center"
-                    title="Abrir en YouTube"
-                  >
-                    <ExternalLink className="w-4 h-4 text-neon" />
-                  </a>
-
-                  {/* Download MP3 */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDownload(beat.videoId, beat.title); }}
-                    className="p-2.5 bg-hot-pink/10 border border-hot-pink/30
-                               hover:bg-hot-pink/20 hover:border-hot-pink
-                               transition-all flex items-center justify-center"
-                    title="Descargar MP3"
-                  >
-                    <Download className="w-4 h-4 text-hot-pink" />
-                  </button>
-
-                  {/* Delete button */}
-                  <button
-                    onClick={() => removeFavorite(beat.videoId)}
-                    className="group/del p-2.5 bg-blood/10 border border-blood/30
-                               hover:bg-blood/30 hover:border-blood
-                               transition-all relative overflow-hidden"
-                  >
-                    <Trash2 className="w-4 h-4 text-blood group-hover/del:scale-110 transition-transform relative z-10" />
-                    <div className="absolute inset-0 bg-blood/20 opacity-0 group-hover/del:opacity-100 transition-opacity blur-sm" />
-                  </button>
-                </div>
+              {/* ACTION BAR — clear, labeled, easy to click */}
+              <div className="flex border-t border-blood/30">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDownload(beat.videoId, beat.title); }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3
+                             text-neon hover:bg-neon/10 active:bg-neon/20
+                             transition-all text-xs uppercase tracking-wider font-bold"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar MP3
+                </button>
+                <a
+                  href={`https://www.youtube.com/watch?v=${beat.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 flex items-center justify-center gap-2 py-3
+                             text-gray-400 hover:text-white hover:bg-white/5
+                             transition-all text-xs uppercase tracking-wider font-bold
+                             border-x border-blood/30"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  YouTube
+                </a>
+                <button
+                  onClick={() => removeFavorite(beat.videoId)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3
+                             text-blood hover:bg-blood/10 active:bg-blood/20
+                             transition-all text-xs uppercase tracking-wider font-bold"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar
+                </button>
               </div>
 
               {/* Bottom accent */}

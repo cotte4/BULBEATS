@@ -54,11 +54,6 @@ export function RankingsView() {
         <p className="text-gray-400 mt-6 uppercase tracking-widest text-sm">
           Cargando rankings...
         </p>
-        <div className="flex gap-1 mt-3">
-          <span className="fire-emoji">🔥</span>
-          <span className="fire-emoji" style={{ animationDelay: '0.1s' }}>🔥</span>
-          <span className="fire-emoji" style={{ animationDelay: '0.2s' }}>🔥</span>
-        </div>
       </div>
     );
   }
@@ -96,7 +91,7 @@ export function RankingsView() {
       </div>
 
       {/* Rankings list */}
-      <div className="max-w-2xl mx-auto space-y-3">
+      <div className="max-w-3xl mx-auto space-y-4">
         {beats.map((beat, i) => {
           const totalVotes = beat.likes + beat.dislikes;
           const likePercent = totalVotes > 0 ? (beat.likes / totalVotes) * 100 : 50;
@@ -107,8 +102,8 @@ export function RankingsView() {
               key={beat.videoId}
               className="relative bg-surface border-2 border-blood/20 hover:border-blood/50
                          transition-all duration-300 overflow-hidden group"
-              style={{ clipPath: 'polygon(0 0, 100% 0, 98% 100%, 2% 100%)' }}
             >
+              {/* Main content row */}
               <div className="flex items-center gap-3 p-3">
                 {/* Rank number */}
                 <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
@@ -128,8 +123,7 @@ export function RankingsView() {
                 </div>
 
                 {/* Thumbnail */}
-                <div className="flex-shrink-0 w-16 h-12 overflow-hidden bg-black/50"
-                     style={{ clipPath: 'polygon(5% 0, 100% 0, 95% 100%, 0 100%)' }}>
+                <div className="flex-shrink-0 w-20 h-14 overflow-hidden bg-black/50 rounded-sm">
                   <img
                     src={beat.thumbnail}
                     alt=""
@@ -156,7 +150,7 @@ export function RankingsView() {
                   {/* Vote bar */}
                   <div className="flex items-center gap-2 mt-1.5">
                     <ThumbsUp className="w-3 h-3 text-neon flex-shrink-0" />
-                    <div className="flex-1 h-1.5 bg-blood/20 overflow-hidden">
+                    <div className="flex-1 h-1.5 bg-blood/20 overflow-hidden rounded-full">
                       <div
                         className="h-full bg-gradient-to-r from-neon to-neon/50 transition-all"
                         style={{ width: `${likePercent}%` }}
@@ -196,26 +190,31 @@ export function RankingsView() {
                     {totalVotes} votos
                   </div>
                 </div>
+              </div>
 
-                {/* Actions */}
-                <div className="flex-shrink-0 flex flex-col gap-1">
-                  <a
-                    href={`https://www.youtube.com/watch?v=${beat.videoId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blood hover:text-white p-1 transition-colors"
-                    title="Ver en YouTube"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                  <button
-                    onClick={() => handleDownload(beat.videoId, beat.title)}
-                    className="text-neon hover:text-white p-1 transition-colors"
-                    title="Descargar MP3"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                </div>
+              {/* ACTION BAR — clear, labeled, easy to click */}
+              <div className="flex border-t border-blood/20">
+                <button
+                  onClick={() => handleDownload(beat.videoId, beat.title)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5
+                             text-neon hover:bg-neon/10 active:bg-neon/20
+                             transition-all text-xs uppercase tracking-wider font-bold"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar MP3
+                </button>
+                <a
+                  href={`https://www.youtube.com/watch?v=${beat.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5
+                             text-gray-400 hover:text-white hover:bg-white/5
+                             transition-all text-xs uppercase tracking-wider font-bold
+                             border-x border-blood/20"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  YouTube
+                </a>
               </div>
             </div>
           );
@@ -237,7 +236,6 @@ export function RankingsView() {
         </div>
       )}
 
-      {/* Bottom spacer */}
       <div className="h-8" />
     </div>
   );
