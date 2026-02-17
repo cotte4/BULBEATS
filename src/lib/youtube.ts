@@ -9,16 +9,6 @@ function decodeHtmlEntities(text: string): string {
   return doc.documentElement.textContent || text;
 }
 
-// Fisher-Yates shuffle for randomizing beats
-function shuffle<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
 // Parse BPM from title (e.g., "140 BPM", "140bpm", "bpm 140")
 function parseBpm(title: string): number | undefined {
   const patterns = [
