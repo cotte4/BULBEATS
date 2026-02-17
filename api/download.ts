@@ -16,6 +16,7 @@ async function tryInstance(instanceUrl: string, videoId: string): Promise<Respon
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
+        'User-Agent': 'BulBeats/1.0',
       },
       body: JSON.stringify({
         url: `https://www.youtube.com/watch?v=${videoId}`,
@@ -48,6 +49,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'videoId is required' });
   }
 
+  const errors: string[] = [];
+
   for (const instance of COBALT_INSTANCES) {
     try {
       const response = await tryInstance(instance, videoId);
@@ -60,13 +63,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           filename: data.filename,
         });
       }
-    } catch {
+
+      errors.push(`${instance}: ${data.status} - ${JSON.stringify(data.error || data.text || 'unknown')}`);
+    } catch (e) {
+      errors.push(`${instance}: ${e instanceof Error ? e.message : 'failed'}`);
       continue;
     }
   }
 
   return res.status(502).json({
-    status: 'fallback',
-    error: 'No se pudo obtener el audio desde el servidor.',
+    status: 'error',
+    error: 'No se pudo obtener el audio.',
+    debug: errors,
   });
 }
