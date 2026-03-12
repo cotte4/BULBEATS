@@ -6,9 +6,9 @@
 
 ---
 
-| **Versión**                    | 1.3 - Referral Program Fixes |
+| **Versión**                    | 1.5 - Demo Mode                          |
 | ------------------------------ | ----------------------------------------- |
-| **Fecha Última Actualización** | 10 de Marzo, 2026                          |
+| **Fecha Última Actualización** | 12 de Marzo, 2026                          |
 | **Fecha Creación**             | 27 de Diciembre, 2024                    |
 | **Deadline MVP**               | 10 de Enero, 2025                        |
 | **Inicio Temporada**           | 28 de Enero, 2025 (Temporada Fiscal USA) |
@@ -245,6 +245,52 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
     - Dark mode supported, fully responsive
     - Added "📈 Estadísticas" nav item to admin dashboard sidebar
     - No external chart library — pure CSS gradients
+
+### ✅ Sesión 11-Mar-2026 — Engineer Fixes & Chatbot KB:
+
+48. ✅ **IRS Monitor — M1-M4 Engineer Fixes (v1.4)** - COMPLETADO
+    - M1: `getFiledClients()` ahora retorna `ssnFull` (SSN desencriptado) además del `ssnMasked`
+      — visible en la tabla del IRS Monitor para que el equipo pueda operar correctamente
+    - M2: Botón "📸 Ver captura" inline en la columna "Último Check IRS" de la tabla principal
+      — carga la screenshot del check más reciente sin necesidad de abrir el historial
+    - M3: Clic en ✓ (aprobar recomendación) ahora abre un modal de confirmación con:
+      — campo "Comentario para el cliente" (visible en portal del cliente)
+      — campo "Comentario interno" (solo visible para el equipo)
+      — ambos comentarios se guardan en `federalLastComment` y `statusHistory`
+    - M4: Columna "Filing" eliminada de la tabla (mostraba "Single" para todos, sin valor)
+
+49. ✅ **WhatsApp Chatbot — KB & Prompt Updates (v1.4)** - COMPLETADO
+    - Ajuste #2: Agregados scripts específicos en system-prompt para cuando el cliente
+      manda W2/PDF o SSN por WhatsApp — redirige a la app, nunca a soporte
+    - Ajuste #3: Datos de pago actualizados en ambos bots (WhatsApp + in-app N8N):
+      — Zelle: jai1@memas.agency / Lautaro Iglesias
+      — Transferencia ARS: $43.000 / CBU 0000031000790171606023 / Lautaro Iglesias
+      — PayPal: lautigle@gmail.com / Lautaro Iglesias
+    - Ajuste #4: Regla explícita — nunca decir que el pago solo se puede hacer en dólares
+    - Auditoría completa de los 10 archivos KB del WhatsApp bot (Relevance AI):
+      — Pricing and Payments: agregados medios de pago reales (era el más crítico)
+      — FAQS: agregar preguntas #21-23 (pago en pesos, medios de pago, W2 por chat)
+      — Conversation Flows: agregar Flow 4B (W2/SSN recibido por chat)
+      — Escalation Rules: agregar excepción para documentos vía chat
+
+### ✅ Sesión 12-Mar-2026 — Demo Mode:
+
+50. ✅ **Demo Mode — Admin Login → Client Portal (v1.5)** - COMPLETADO
+    - Problema: los owners creaban cuentas dummy en producción para hacer demos
+    - Solución: botón "Modo Demo" en la página `/admin-login` que abre el portal
+      del cliente como una cuenta demo pre-seedeada, sin necesidad de credenciales
+    - Backend: `POST /auth/demo-session` (público, throttled 10/min) — busca
+      `demo@jai1.com` y devuelve tokens JWT válidos como cualquier login normal
+    - Backend: `POST /auth/demo/reset` (admin-only) — borra todos los datos del
+      demo en una `$transaction`: tickets, documentos, historial, taxCases, perfil,
+      W2s, notificaciones, refresh tokens
+    - Frontend: botón "Modo Demo" en `admin-login.html` con estado de carga,
+      estilos secundarios (outline), separador visual
+    - Frontend: botón "🔄 Reset Demo" en sidebar de admin dashboard bajo "Herramientas"
+    - Demo user excluida permanentemente de todos los listados del admin panel
+      via filtro `user.email NOT 'demo@jai1.com'` en `client-query.service.ts`
+    - Setup one-time: INSERT SQL del usuario demo en producción (hecho ✅)
+    - Pendiente: poblar `ClientProfile` con datos demo realistas para una demo visual
 
 ### ⏳ Pendiente (Próximas prioridades):
 
