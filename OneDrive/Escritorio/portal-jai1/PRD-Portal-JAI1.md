@@ -6,9 +6,9 @@
 
 ---
 
-| **Versión**                    | 1.5 - Demo Mode                          |
+| **Versión**                    | 1.6 - Dashboard Track Filters             |
 | ------------------------------ | ----------------------------------------- |
-| **Fecha Última Actualización** | 12 de Marzo, 2026                          |
+| **Fecha Última Actualización** | 12 de Marzo, 2026                         |
 | **Fecha Creación**             | 27 de Diciembre, 2024                    |
 | **Deadline MVP**               | 10 de Enero, 2025                        |
 | **Inicio Temporada**           | 28 de Enero, 2025 (Temporada Fiscal USA) |
@@ -273,7 +273,7 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
       — Conversation Flows: agregar Flow 4B (W2/SSN recibido por chat)
       — Escalation Rules: agregar excepción para documentos vía chat
 
-### ✅ Sesión 12-Mar-2026 — Demo Mode:
+### ✅ Sesión 12-Mar-2026 (mañana) — Demo Mode:
 
 50. ✅ **Demo Mode — Admin Login → Client Portal (v1.5)** - COMPLETADO
     - Problema: los owners creaban cuentas dummy en producción para hacer demos
@@ -291,6 +291,33 @@ Portal JAI1 es una aplicación web full-stack diseñada para gestionar el servic
       via filtro `user.email NOT 'demo@jai1.com'` en `client-query.service.ts`
     - Setup one-time: INSERT SQL del usuario demo en producción (hecho ✅)
     - Pendiente: poblar `ClientProfile` con datos demo realistas para una demo visual
+
+### ✅ Sesión 12-Mar-2026 (tarde) — Dashboard Fixes & Track Filters (v1.6):
+
+51. ✅ **Build Error Fix** - COMPLETADO
+    - `router` era `private` en `AdminDashboard` pero el template lo accedía directamente
+    - Fix: cambiar a `router = inject(Router)` (sin private)
+    - El build de producción fallaba silenciosamente — Railway desplegaba versión vieja
+
+52. ✅ **Demo Page — Bug Fixes (v1.6)** - COMPLETADO
+    - 401 en `GET /auth/demo/status`: auth interceptor skippeaba token para todas las URLs
+      con `/auth/` — fix: agregar `/auth/demo/` como excepción
+    - 500 en `GET /admin/stats/season`: SQL crudo comparaba columnas enum de Postgres
+      con text sin casting — fix: agregar `::text` en todas las columnas enum del raw SQL
+
+53. ✅ **Dashboard Track Filter — Federal / Estatal / Ambos (v1.6)** - COMPLETADO
+    - 3 botones toggle sobre las tarjetas de estadísticas: Ambos / 🇺🇸 Federal / 🏛️ Estatal
+    - Al seleccionar un track, los group filters (En Proceso, Completados, etc.) filtran
+      solo por `federalStatusNew` o `stateStatusNew` según corresponda
+    - Las tarjetas de conteo también reflejan el track seleccionado (cálculo client-side)
+    - Backend: nuevo parámetro `track` en `GET /admin/clients` y `findAll()` options
+    - Corregido `group_in_review` para incluir los 6 estados activos (antes solo 3)
+    - En modo "Ambos": counts vienen del backend (más precisos)
+    - En modo Federal/Estatal: counts recalculados client-side
+
+54. ✅ **Total Clientes — Corrección (v1.6)** - COMPLETADO
+    - `getSeasonStats().totalClients` ahora cuenta TODOS los `clientProfile` (no solo taxes_filed)
+    - Dashboard y Estadísticas muestran el mismo número total de clientes
 
 ### ⏳ Pendiente (Próximas prioridades):
 
